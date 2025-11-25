@@ -1,30 +1,94 @@
-# Dynamic configuration for Traefik
+# ============================================================================
+# Traefik Dynamic Configuration - ECCS Platform
+# ============================================================================
+# This file contains dynamic configuration that can be changed without
+# restarting Traefik. Changes are detected automatically via file watching.
+#
+# CONFIGURATION SECTIONS:
+#   - Middlewares: Reusable request/response processing
+#   - Services: Backend service definitions
+#   - Routers: URL routing rules
+#   - TLS: TLS/SSL configuration
+#
+# MIDDLEWARE ORDER (applied left to right):
+#   1. rate-limit (reject excess requests)
+#   2. security-headers (add security headers)
+#   3. jwt-auth (authenticate requests)
+#   4. retry (retry failed requests)
+# ============================================================================
 
 http:
+  # ---------------------------------------------------------------------------
+  # Middlewares
+  # ---------------------------------------------------------------------------
+  # Reusable middleware configurations for request processing.
   middlewares:
-    # JWT Authentication middleware
+    # -------------------------------------------------------------------------
+    # JWT Authentication Middleware
+    # -------------------------------------------------------------------------
+    # Validates JWT tokens by forwarding to the auth service.
+    # The auth service responds with user information in headers.
+    #
+    # FLOW:
+    #   1. Traefik forwards request to auth-service:/api/auth/verify
+    #   2. Auth service validates JWT token
+    #   3. If valid, returns 200 with X-User-Id and X-User-Email headers
+    #   4. If invalid, returns 401 and Traefik rejects the request
+    #   5. Traefik adds auth headers to the original request
     jwt-auth:
       forwardAuth:
+        # Auth service verification endpoint
         address: "http://auth-service:3002/api/auth/verify"
+        # Headers to copy from auth response to upstream request
         authResponseHeaders:
           - "X-User-Id"
           - "X-User-Email"
+          - "X-User-Role"
+        # Trust X-Forwarded-* headers from previous proxies
+        trustForwardHeader: true
 
-    # Rate limiting
+    # -------------------------------------------------------------------------
+    # Rate Limiting Middleware
+    # -------------------------------------------------------------------------
+    # Prevents abuse by limiting requests per source IP.
+    #
+    # SETTINGS:
+    #   - average: 100 requests per period (sustainable rate)
+    #   - burst: 50 additional requests allowed in bursts
+    #   - period: Time window for rate calculation
     rate-limit:
       rateLimit:
+        # Sustainable request rate per period
         average: 100
+        # Burst capacity (additional requests allowed)
         burst: 50
+        # Time period for rate calculation
         period: 1m
+        # Source of rate limit tracking (IP address)
+        sourceCriterion:
+          ipStrategy:
+            depth: 0
 
-    # Security headers
+    # -------------------------------------------------------------------------
+    # Security Headers Middleware
+    # -------------------------------------------------------------------------
+    # Adds security headers to all responses for XSS, clickjacking,
+    # and other web security protections.
+    #
+    # HEADERS ADDED:
+    #   - X-Frame-Options: DENY (prevent clickjacking)
+    #   - X-Content-Type-Options: nosniff (prevent MIME sniffing)
+    #   - X-XSS-Protection: 1; mode=block (enable XSS filter)
+    #   - Strict-Transport-Security: enforce HTTPS
     security-headers:
       headers:
+        # CORS settings
         accessControlAllowMethods:
           - GET
           - POST
           - PUT
           - DELETE
+          - PATCH
           - OPTIONS
         accessControlAllowHeaders:
           - "*"
@@ -32,37 +96,75 @@ http:
           - "*"
         accessControlMaxAge: 100
         addVaryHeader: true
+        # Security headers
         frameDeny: true
-        sslRedirect: false
+        sslRedirect: false  # Set to true in production with HTTPS
         browserXssFilter: true
         contentTypeNosniff: true
+        # HSTS settings (enable in production)
         forceSTSHeader: true
         stsIncludeSubdomains: true
         stsPreload: true
         stsSeconds: 31536000
+        # Content Security Policy
+        customResponseHeaders:
+          X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
 
-    # Retry middleware
+    # -------------------------------------------------------------------------
+    # Retry Middleware
+    # -------------------------------------------------------------------------
+    # Automatically retries failed requests to handle transient failures.
+    #
+    # RETRY CONDITIONS:
+    #   - Network errors
+    #   - 502 Bad Gateway
+    #   - 503 Service Unavailable
+    #   - 504 Gateway Timeout
     retry:
       retry:
         attempts: 3
         initialInterval: 100ms
 
-    # Circuit breaker
+    # -------------------------------------------------------------------------
+    # Circuit Breaker Middleware
+    # -------------------------------------------------------------------------
+    # Prevents cascading failures by stopping requests to unhealthy services.
+    #
+    # EXPRESSION: Opens circuit when 30% of requests fail with network errors
     circuit-breaker:
       circuitBreaker:
         expression: "NetworkErrorRatio() > 0.30"
 
-  # Service configurations
+    # -------------------------------------------------------------------------
+    # Compression Middleware
+    # -------------------------------------------------------------------------
+    # Compresses responses to reduce bandwidth usage.
+    compress:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+
+  # ---------------------------------------------------------------------------
+  # Services
+  # ---------------------------------------------------------------------------
+  # Backend service definitions with load balancing and health checks.
   services:
+    # Email service backend
     email-service:
       loadBalancer:
         servers:
           - url: "http://email-service:3001"
+        # Health check configuration
         healthCheck:
           path: /health
           interval: 10s
           timeout: 3s
+        # Sticky sessions (optional, for stateful services)
+        # sticky:
+        #   cookie:
+        #     name: eccs-email-sticky
 
+    # Auth service backend
     auth-service:
       loadBalancer:
         servers:
@@ -72,29 +174,58 @@ http:
           interval: 10s
           timeout: 3s
 
+  # ---------------------------------------------------------------------------
+  # Routers
+  # ---------------------------------------------------------------------------
+  # URL routing rules that connect entrypoints to services via middlewares.
   routers:
+    # Email API router (protected by JWT)
     email-router:
+      # Match requests starting with /api/emails
       rule: "PathPrefix(`/api/emails`)"
+      # Use the email service backend
       service: email-service
+      # Apply middlewares in order
       middlewares:
         - jwt-auth
         - rate-limit
         - security-headers
         - retry
+      # Use HTTP entrypoint
+      entryPoints:
+        - web
 
+    # Auth API router (public - no JWT required)
     auth-router:
       rule: "PathPrefix(`/api/auth`)"
       service: auth-service
       middlewares:
         - rate-limit
         - security-headers
+      entryPoints:
+        - web
 
-# TCP/TLS configuration (optional)
+# -----------------------------------------------------------------------------
+# TLS Configuration
+# -----------------------------------------------------------------------------
+# TLS/SSL settings for HTTPS connections.
 tls:
   options:
+    # Default TLS options
     default:
+      # Minimum TLS version (TLS 1.2 recommended)
       minVersion: VersionTLS12
+      # Preferred cipher suites (ordered by preference)
       cipherSuites:
         - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
         - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
         - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+      # Prefer server cipher suites
+      preferServerCipherSuites: true
+      # Client authentication (optional)
+      # clientAuth:
+      #   caFiles:
+      #     - /etc/traefik/certs/ca.crt
+      #   clientAuthType: RequireAndVerifyClientCert

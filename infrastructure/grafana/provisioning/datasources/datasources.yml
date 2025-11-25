@@ -1,27 +1,115 @@
+# ============================================================================
+# Grafana Datasources Provisioning - ECCS Platform
+# ============================================================================
+# Auto-configures data sources on Grafana startup.
+# These are read-only and cannot be modified via the UI.
+#
+# DATA SOURCES:
+#   - Prometheus: Metrics from all ECCS services
+#   - Elasticsearch: Centralized log storage from Logstash
+#   - Jaeger: Distributed tracing for request correlation
+#
+# USAGE:
+#   - File is read on Grafana startup
+#   - Changes require Grafana restart to take effect
+#   - Data sources are marked read-only (editable: false)
+# ============================================================================
+
 apiVersion: 1
 
+# Delete datasources that are no longer in this file (optional)
+deleteDatasources: []
+
 datasources:
+  # -------------------------------------------------------------------------
+  # Prometheus - Primary Metrics Data Source
+  # -------------------------------------------------------------------------
+  # Prometheus scrapes metrics from all ECCS services and stores time-series
+  # data for visualization and alerting.
+  #
+  # SCRAPE TARGETS (defined in prometheus.yml):
+  #   - email-service:3001/metrics
+  #   - auth-service:3002/metrics
+  #   - notification-service:3003/metrics
+  #   - traefik:8080/metrics
+  # -------------------------------------------------------------------------
   - name: Prometheus
     type: prometheus
     access: proxy
+    # Internal container URL (resolved via Podman network)
     url: http://prometheus:9090
+    # Set as default data source for new panels
     isDefault: true
+    # Prevent UI modifications (source of truth is this file)
     editable: false
+    jsonData:
+      # HTTP method for queries (POST handles larger queries)
+      httpMethod: POST
+      # Enable Grafana-managed alerting
+      manageAlerts: true
+      # Prometheus server type and version
+      prometheusType: Prometheus
+      prometheusVersion: 2.47.0
+      # Query timeout in seconds
+      timeout: 60
+      # Scrape interval (should match Prometheus config)
+      scrapeInterval: 15s
 
+  # -------------------------------------------------------------------------
+  # Elasticsearch - Log Aggregation Data Source
+  # -------------------------------------------------------------------------
+  # Elasticsearch stores all application logs processed by Logstash.
+  # Used for log exploration, search, and log-based dashboards.
+  #
+  # INDEX PATTERN: eccs-logs-* (daily indices: eccs-logs-2024.01.15)
+  # TIME FIELD: @timestamp (standard Logstash field)
+  # -------------------------------------------------------------------------
   - name: Elasticsearch
     type: elasticsearch
     access: proxy
+    # Internal container URL
     url: http://elasticsearch:9200
+    # Index pattern for log queries (wildcard for all daily indices)
     database: "eccs-logs-*"
-    jsonData:
-      timeField: "@timestamp"
-      esVersion: "8.11.0"
-      logMessageField: "message"
-      logLevelField: "level"
     editable: false
+    jsonData:
+      # Time field for time-based queries
+      timeField: "@timestamp"
+      # Elasticsearch version for query compatibility
+      esVersion: "8.11.0"
+      # Field containing log message text
+      logMessageField: "message"
+      # Field containing log level (info, warn, error)
+      logLevelField: "level"
+      # Maximum concurrent shard requests
+      maxConcurrentShardRequests: 5
 
+  # -------------------------------------------------------------------------
+  # Jaeger - Distributed Tracing Data Source
+  # -------------------------------------------------------------------------
+  # Jaeger collects and stores distributed traces from all ECCS services.
+  # Used for debugging request flows across microservices.
+  #
+  # INTEGRATION:
+  #   - Correlates traces with logs via traceId
+  #   - Links to Prometheus metrics via service labels
+  # -------------------------------------------------------------------------
   - name: Jaeger
     type: jaeger
+    uid: jaeger
     access: proxy
+    # Internal container URL
     url: http://jaeger:16686
     editable: false
+    jsonData:
+      # Enable trace-to-logs correlation
+      tracesToLogs:
+        datasourceUid: elasticsearch
+        # Match traces to logs using service name
+        tags: ['service']
+        # Filter logs by trace ID
+        filterByTraceID: true
+        filterBySpanID: true
+      # Enable node graph visualization
+      nodeGraph:
+        enabled: true

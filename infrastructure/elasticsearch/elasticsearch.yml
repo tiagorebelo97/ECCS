@@ -1,0 +1,109 @@
+# ============================================================================
+# Elasticsearch Configuration for ECCS Platform
+# ============================================================================
+# This configuration is optimized for a single-node development/staging
+# deployment. For production, enable security features and clustering.
+#
+# PERFORMANCE TUNING:
+#   - Configured for logging workloads
+#   - Optimized for write-heavy operations
+#   - Index lifecycle management enabled
+# ============================================================================
+
+# -----------------------------------------------------------------------------
+# Cluster Settings
+# -----------------------------------------------------------------------------
+# Cluster name (used for discovery and identification)
+cluster.name: eccs-logging
+
+# Node name (unique identifier for this node)
+node.name: eccs-es-node-1
+
+# -----------------------------------------------------------------------------
+# Network Settings
+# -----------------------------------------------------------------------------
+# Bind to all interfaces (required for container networking)
+network.host: 0.0.0.0
+
+# HTTP port for REST API
+http.port: 9200
+
+# Transport port for node-to-node communication
+transport.port: 9300
+
+# Enable CORS for Kibana and other clients
+http.cors.enabled: true
+http.cors.allow-origin: "*"
+http.cors.allow-headers: "X-Requested-With,Content-Type,Content-Length,Authorization"
+
+# -----------------------------------------------------------------------------
+# Discovery Settings
+# -----------------------------------------------------------------------------
+# Single-node discovery (no cluster formation)
+discovery.type: single-node
+
+# -----------------------------------------------------------------------------
+# Path Settings
+# -----------------------------------------------------------------------------
+# Data directory (should be on persistent volume)
+path.data: /usr/share/elasticsearch/data
+
+# Logs directory
+path.logs: /usr/share/elasticsearch/logs
+
+# -----------------------------------------------------------------------------
+# Memory Settings
+# -----------------------------------------------------------------------------
+# Disable memory swapping (critical for performance)
+bootstrap.memory_lock: true
+
+# -----------------------------------------------------------------------------
+# Index Settings
+# -----------------------------------------------------------------------------
+# Default number of shards for new indices
+# 1 shard is optimal for single-node
+index.number_of_shards: 1
+
+# Default number of replicas (0 for single-node)
+index.number_of_replicas: 0
+
+# Refresh interval for near-real-time search
+index.refresh_interval: 5s
+
+# -----------------------------------------------------------------------------
+# Security Settings (X-Pack)
+# -----------------------------------------------------------------------------
+# Disable security for development (ENABLE IN PRODUCTION)
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+
+# When security is enabled, configure these:
+# xpack.security.transport.ssl.enabled: true
+# xpack.security.http.ssl.enabled: true
+
+# -----------------------------------------------------------------------------
+# Monitoring Settings
+# -----------------------------------------------------------------------------
+# Enable cluster monitoring
+xpack.monitoring.collection.enabled: true
+
+# Export monitoring data locally
+xpack.monitoring.elasticsearch.collection.enabled: true
+
+# -----------------------------------------------------------------------------
+# Index Lifecycle Management (ILM)
+# -----------------------------------------------------------------------------
+# Enable ILM for automatic log rotation
+xpack.ilm.enabled: true
+
+# -----------------------------------------------------------------------------
+# Thread Pool Settings
+# -----------------------------------------------------------------------------
+# Optimize for write-heavy workloads
+thread_pool.write.queue_size: 1000
+
+# -----------------------------------------------------------------------------
+# Action Settings
+# -----------------------------------------------------------------------------
+# Allow automatic index creation (required for Logstash)
+action.auto_create_index: true

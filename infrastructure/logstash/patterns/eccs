@@ -1,0 +1,34 @@
+# ============================================================================
+# ECCS Custom Grok Patterns
+# ============================================================================
+# Custom patterns for parsing ECCS-specific log formats.
+# These extend the built-in Grok patterns.
+# ============================================================================
+
+# Email-related patterns
+EMAILID [a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}
+EMAILSTATUS (?:pending|processing|sent|failed|retry|dlq)
+
+# User-related patterns
+USERID [0-9]+
+USEREMAIL %{EMAILADDRESS}
+
+# HTTP-related patterns
+HTTPMETHOD (?:GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)
+HTTPSTATUSCODE [1-5][0-9][0-9]
+
+# Distributed tracing patterns
+TRACEID [a-f0-9]{32}
+SPANID [a-f0-9]{16}
+
+# Kafka patterns
+KAFKATOPIC [a-zA-Z0-9._-]+
+KAFKAPARTITION [0-9]+
+KAFKAOFFSET [0-9]+
+
+# Node.js patterns
+NODELOGLEVEL (?:trace|debug|info|warn|error|fatal)
+NODEPID [0-9]+
+
+# ECCS service log format
+ECCSLOG \[%{TIMESTAMP_ISO8601:timestamp}\] \[%{NODELOGLEVEL:level}\] \[%{DATA:service}\] %{GREEDYDATA:message}

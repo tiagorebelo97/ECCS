@@ -1,0 +1,152 @@
+# ============================================================================
+# Traefik Static Configuration - ECCS Platform
+# ============================================================================
+# Main Traefik configuration file for API gateway functionality.
+# This file is read once at startup. Use dynamic configuration for
+# changes that should take effect without restart.
+#
+# CONFIGURATION HIERARCHY:
+#   1. CLI flags (highest priority)
+#   2. Environment variables
+#   3. This static configuration file
+#   4. Dynamic configuration files (lowest priority)
+# ============================================================================
+
+# -----------------------------------------------------------------------------
+# Global Settings
+# -----------------------------------------------------------------------------
+global:
+  # Don't check for Traefik updates
+  checkNewVersion: false
+  # Don't send anonymous usage data
+  sendAnonymousUsage: false
+
+# -----------------------------------------------------------------------------
+# API and Dashboard
+# -----------------------------------------------------------------------------
+api:
+  # Enable the API
+  insecure: true
+  # Enable the dashboard
+  dashboard: true
+  # Enable debug mode (disable in production)
+  debug: false
+
+# Enable ping endpoint for health checks
+ping:
+  entryPoint: traefik
+
+# -----------------------------------------------------------------------------
+# Entrypoints
+# -----------------------------------------------------------------------------
+# Entrypoints are the network entry points into Traefik.
+entryPoints:
+  # HTTP entrypoint (port 80)
+  web:
+    address: ":80"
+    # Optional: Redirect HTTP to HTTPS
+    # http:
+    #   redirections:
+    #     entryPoint:
+    #       to: websecure
+    #       scheme: https
+
+  # HTTPS entrypoint (port 443)
+  websecure:
+    address: ":443"
+    # HTTP/2 settings
+    http2:
+      maxConcurrentStreams: 250
+    # TLS configuration is in dynamic config
+
+  # Dashboard/API entrypoint (internal only)
+  traefik:
+    address: ":8080"
+
+# -----------------------------------------------------------------------------
+# Providers
+# -----------------------------------------------------------------------------
+# Providers are infrastructure components that provide configuration to Traefik.
+providers:
+  # Docker/Podman provider
+  # Reads container labels for routing configuration
+  docker:
+    # Container socket endpoint
+    # For Podman: /run/podman/podman.sock
+    # For Docker: /var/run/docker.sock
+    endpoint: "unix:///var/run/docker.sock"
+    # Don't expose containers by default (require explicit labels)
+    exposedByDefault: false
+    # Network to use for container communication
+    network: eccs-network
+    # Watch for container changes
+    watch: true
+
+  # File provider for dynamic configuration
+  file:
+    # Directory containing dynamic configuration files
+    directory: "/etc/traefik/dynamic"
+    # Watch for file changes
+    watch: true
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+log:
+  # Log level (DEBUG, INFO, WARN, ERROR)
+  level: INFO
+  # Log format (common, json)
+  format: json
+
+# Access log configuration
+accessLog:
+  # Enable access logging
+  format: json
+  # Buffer size (number of access logs to buffer before writing)
+  bufferingSize: 100
+  # Filter access logs
+  filters:
+    # Only log status codes >= 400
+    statusCodes:
+      - "400-599"
+    # Minimum duration to log
+    minDuration: "10ms"
+
+# -----------------------------------------------------------------------------
+# Tracing (Jaeger)
+# -----------------------------------------------------------------------------
+tracing:
+  # Jaeger backend for distributed tracing
+  jaeger:
+    # Sampling server URL
+    samplingServerURL: "http://jaeger:5778/sampling"
+    # Local agent for trace collection
+    localAgentHostPort: "jaeger:6831"
+    # Trace propagation format
+    propagation: "jaeger"
+    # Service name in traces
+    traceContextHeaderName: "uber-trace-id"
+
+# -----------------------------------------------------------------------------
+# Metrics (Prometheus)
+# -----------------------------------------------------------------------------
+metrics:
+  prometheus:
+    # Enable Prometheus metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+    # Expose on the traefik entrypoint
+    entryPoint: traefik
+
+# -----------------------------------------------------------------------------
+# Certificate Resolvers (Let's Encrypt)
+# -----------------------------------------------------------------------------
+# Uncomment for automatic TLS certificates in production
+# certificatesResolvers:
+#   letsencrypt:
+#     acme:
+#       email: admin@example.com
+#       storage: /etc/traefik/acme.json
+#       httpChallenge:
+#         entryPoint: web
