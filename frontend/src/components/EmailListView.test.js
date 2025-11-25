@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import EmailListView from './EmailListView';
 import * as useApiModule from '../hooks/useApi';
 
@@ -145,8 +145,9 @@ describe('EmailListView', () => {
       
       render(<EmailListView onEmailSelect={onEmailSelect} />);
       
-      const emailItem = screen.getByText('Test Email 1').closest('[role="listitem"]');
-      fireEvent.click(emailItem);
+      const emailList = screen.getByRole('list', { name: /email list/i });
+      const emailItems = within(emailList).getAllByRole('listitem');
+      fireEvent.click(emailItems[0]);
       
       expect(onEmailSelect).toHaveBeenCalledWith(mockEmails[0]);
     });
@@ -195,8 +196,9 @@ describe('EmailListView', () => {
       render(<EmailListView onEmailSelect={onEmailSelect} />);
       
       // Focus and press Enter on first email
-      const emailItem = screen.getByText('Test Email 1').closest('[role="listitem"]');
-      fireEvent.keyDown(emailItem, { key: 'Enter', code: 'Enter' });
+      const emailList = screen.getByRole('list', { name: /email list/i });
+      const emailItems = within(emailList).getAllByRole('listitem');
+      fireEvent.keyDown(emailItems[0], { key: 'Enter', code: 'Enter' });
       
       expect(onEmailSelect).toHaveBeenCalledWith(mockEmails[0]);
     });

@@ -191,12 +191,20 @@ describe('TemplateEditor', () => {
     it('should mark invalid fields with aria-invalid when validation fails', async () => {
       render(<TemplateEditor />);
       
-      // Try to save with empty fields
+      // Type only in subject field (name is still empty, so validation should fail for name)
+      const subjectInput = screen.getByLabelText(/email subject/i);
+      fireEvent.change(subjectInput, { target: { value: 'Test Subject' } });
+      
+      // Try to save - name field is empty so validation should fail
       fireEvent.click(screen.getByRole('button', { name: /save template/i }));
       
+      // Check that error message appears for name field
       await waitFor(() => {
-        expect(screen.getByLabelText(/template name/i)).toHaveAttribute('aria-invalid', 'true');
+        expect(screen.getByText(/template name is required/i)).toBeInTheDocument();
       });
+      
+      // aria-invalid should be true for the name field
+      expect(screen.getByLabelText(/template name/i)).toHaveAttribute('aria-invalid', 'true');
     });
   });
 });
