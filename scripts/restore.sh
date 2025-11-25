@@ -54,7 +54,7 @@ mongodump_file="$BACKUP_DIR/mongodb/eccs_logs_${TIMESTAMP}.tar.gz"
 if [ -f "$mongodump_file" ]; then
     temp_dir=$(mktemp -d)
     tar -xzf "$mongodump_file" -C "$temp_dir"
-    mongorestore --uri="$MONGODB_URI" --db="$MONGODB_DATABASE" --drop "$temp_dir/eccs_logs_${TIMESTAMP}/$MONGODB_DATABASE"
+    mongorestore --uri="$MONGODB_URI" --db="$MONGODB_DATABASE" --drop "$temp_dir/eccs_logs_${TIMESTAMP}/eccs_logs"
     rm -rf "$temp_dir"
     echo "  MongoDB restored successfully"
 else

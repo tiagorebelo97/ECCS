@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const mongoose = require('mongoose');
 const { Kafka } = require('kafkajs');
@@ -26,6 +27,15 @@ const httpRequestDuration = new promClient.Histogram({
   help: 'Duration of HTTP requests in seconds',
   labelNames: ['method', 'route', 'status_code'],
   buckets: [0.1, 0.5, 1, 2, 5]
+});
+
+// Rate limiting
+const emailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 // Middleware
@@ -81,8 +91,8 @@ app.set('db', pool);
 app.set('kafka', producer);
 app.set('tracer', tracer);
 
-// Routes
-app.use('/api/emails', authMiddleware, emailRoutes);
+// Routes with rate limiting
+app.use('/api/emails', emailLimiter, authMiddleware, emailRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

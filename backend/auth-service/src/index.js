@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const promClient = require('prom-client');
 const logger = require('./config/logger');
@@ -13,6 +14,15 @@ const PORT = process.env.PORT || 3002;
 // Prometheus metrics
 const collectDefaultMetrics = promClient.collectDefaultMetrics;
 collectDefaultMetrics();
+
+// Rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // Middleware
 app.use(helmet());
@@ -42,8 +52,8 @@ const pool = new Pool({
 // Make db available to routes
 app.set('db', pool);
 
-// Routes
-app.use('/api/auth', authRoutes);
+// Routes with rate limiting
+app.use('/api/auth', authLimiter, authRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

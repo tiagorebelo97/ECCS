@@ -15,7 +15,7 @@ datasources:
     database: "eccs-logs-*"
     jsonData:
       timeField: "@timestamp"
-      esVersion: "8.0.0"
+      esVersion: "8.11.0"
       logMessageField: "message"
       logLevelField: "level"
     editable: false
