@@ -1,0 +1,14 @@
+{
+  "_comment": "ECCS Kibana Saved Objects - Import via Kibana UI or API",
+  "objects": [
+    {
+      "type": "index-pattern",
+      "id": "eccs-logs-*",
+      "attributes": {
+        "title": "eccs-logs-*",
+        "timeFieldName": "@timestamp"
+      }
+    }
+  ],
+  "version": "8.11.0"
+}

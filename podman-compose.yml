@@ -1,55 +1,219 @@
+# ============================================================================
+# ECCS Podman Compose Configuration
+# ============================================================================
+# This file defines all services for the ECCS (Email Communication and Control
+# System) platform using Podman Compose syntax.
+#
+# PODMAN COMPATIBILITY:
+#   This configuration is optimized for Podman but also works with Docker.
+#   - Uses rootless container execution where possible
+#   - Supports Podman socket for dynamic service discovery
+#   - Compatible with podman-compose or docker-compose
+#
+# ARCHITECTURE:
+#   ┌─────────────────────────────────────────────────────────────────────────┐
+#   │                            Traefik (API Gateway)                        │
+#   │                         Port 80, 443, 8080                              │
+#   └────────────────┬────────────────┬───────────────────────────────────────┘
+#                    │                │
+#   ┌────────────────▼────┐  ┌────────▼────────────┐
+#   │   Frontend (React)  │  │  Backend Services   │
+#   │      Port 3000      │  │                     │
+#   └─────────────────────┘  │  ┌──────────────┐   │
+#                            │  │ Auth Service │   │
+#                            │  │   Port 3002  │   │
+#                            │  └──────────────┘   │
+#                            │  ┌──────────────┐   │
+#                            │  │Email Service │   │
+#                            │  │   Port 3001  │   │
+#                            │  └──────────────┘   │
+#                            │  ┌──────────────┐   │
+#                            │  │ Notification │   │
+#                            │  │   Service    │   │
+#                            │  └──────────────┘   │
+#                            └────────────────────┘
+#                                      │
+#   ┌──────────────────────────────────┼──────────────────────────────────────┐
+#   │                        Data Layer                                       │
+#   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────────┐  │
+#   │  │  PostgreSQL  │  │   MongoDB    │  │    Kafka + Zookeeper         │  │
+#   │  │  Port 5432   │  │  Port 27017  │  │    Ports 9092, 2181          │  │
+#   │  └──────────────┘  └──────────────┘  └──────────────────────────────┘  │
+#   └─────────────────────────────────────────────────────────────────────────┘
+#                                      │
+#   ┌──────────────────────────────────┼──────────────────────────────────────┐
+#   │                     Observability Stack                                 │
+#   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐ │
+#   │  │Elasticsearch │  │   Logstash   │  │    Kibana    │  │   Grafana   │ │
+#   │  │  Port 9200   │  │  Port 5044   │  │  Port 5601   │  │  Port 3030  │ │
+#   │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘ │
+#   │  ┌──────────────┐  ┌──────────────┐                                     │
+#   │  │  Prometheus  │  │    Jaeger    │                                     │
+#   │  │  Port 9090   │  │  Port 16686  │                                     │
+#   │  └──────────────┘  └──────────────┘                                     │
+#   └─────────────────────────────────────────────────────────────────────────┘
+#
+# STARTUP ORDER:
+#   1. Infrastructure: zookeeper, kafka, postgres, mongodb, elasticsearch
+#   2. Observability: logstash, kibana, prometheus, grafana, jaeger
+#   3. Backend: auth-service, email-service, notification-service
+#   4. Frontend: frontend
+#   5. Gateway: traefik (routes traffic to all services)
+#
+# SECURITY FEATURES:
+#   - All services run as non-root users where supported
+#   - Secrets managed via environment variables (use .env file)
+#   - Internal network isolation (eccs-network)
+#   - TLS support via Traefik
+#
+# USAGE:
+#   Development:  podman-compose up -d
+#   Production:   podman-compose -f podman-compose.yml -f podman-compose.prod.yml up -d
+#   Logs:         podman-compose logs -f [service]
+#   Stop:         podman-compose down
+#   Clean:        podman-compose down -v (removes volumes - DATA LOSS!)
+#
+# ENVIRONMENT:
+#   Copy .env.example to .env and configure:
+#   - POSTGRES_PASSWORD: Database password (required)
+#   - JWT_SECRET: JWT signing key (required)
+#   - GRAFANA_PASSWORD: Grafana admin password
+#   - SMTP_*: Email server configuration
+# ============================================================================
+
 version: '3.8'
 
 services:
+  # ==========================================================================
+  # FRONTEND SERVICES
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
   # Frontend - React Application
+  # --------------------------------------------------------------------------
+  # The React-based web interface for the ECCS platform.
+  # Serves static files via Nginx and proxies API requests to Traefik.
+  #
+  # BUILD:
+  #   Multi-stage build: Node.js builds React app, Nginx serves static files
+  #
+  # SECURITY:
+  #   - Runs as nginx user (non-root)
+  #   - Security headers configured in nginx.conf
+  #   - No direct database access
+  #
+  # DEPENDENCIES:
+  #   - Traefik: For API routing
+  # --------------------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # Build arguments for React environment configuration
+      args:
+        - REACT_APP_API_URL=http://localhost:80
+        - NODE_ENV=production
     container_name: eccs-frontend
+    # Port mapping: host:container
+    # Container runs on 3000 (unprivileged for rootless)
     ports:
       - "3000:3000"
+    # Environment variables for runtime configuration
     environment:
+      # API URL (used by nginx proxy, not React build)
       - REACT_APP_API_URL=http://traefik:80
+    # Service dependencies - frontend starts after traefik
     depends_on:
       - traefik
+    # Network attachment for inter-container communication
     networks:
       - eccs-network
+    # Traefik labels for dynamic routing configuration
     labels:
+      # Enable this container for Traefik routing
       - "traefik.enable=true"
+      # Route rule: Match requests to frontend.localhost
       - "traefik.http.routers.frontend.rule=Host(`frontend.localhost`)"
+      # Backend service port
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    # Restart policy for reliability
+    restart: unless-stopped
+    # Resource limits (optional, adjust based on needs)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.5'
+    #       memory: 256M
 
-  # Backend Email Service
+  # ==========================================================================
+  # BACKEND SERVICES
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # Email Service - Core Email Processing
+  # --------------------------------------------------------------------------
+  # Handles email composition, validation, and queuing.
+  # Publishes events to Kafka for async processing.
+  #
+  # API ENDPOINTS:
+  #   POST /api/emails - Create and queue new email
+  #   GET  /api/emails - List user's emails
+  #   GET  /api/emails/:id - Get email details
+  #
+  # SECURITY:
+  #   - Runs as node user (UID 1000)
+  #   - JWT authentication required (via Traefik)
+  #   - Database credentials via environment
+  #
+  # DEPENDENCIES:
+  #   - PostgreSQL: Email metadata storage
+  #   - Kafka: Event publishing
+  #   - MongoDB: Logging
+  # --------------------------------------------------------------------------
   email-service:
     build:
       context: ./backend/email-service
       dockerfile: Dockerfile
     container_name: eccs-email-service
+    # Environment variables for service configuration
     environment:
+      # Runtime environment
       - NODE_ENV=production
+      # PostgreSQL connection settings
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=eccs_email
       - POSTGRES_USER=eccs_user
+      # Password from .env file (never commit secrets!)
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-eccs_secure_password}
+      # Kafka broker address for event publishing
       - KAFKA_BROKERS=kafka:9092
+      # MongoDB connection for logging
       - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
+      # JWT secret for token verification (must match auth-service)
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      # Jaeger endpoint for distributed tracing
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+    # Service startup order
     depends_on:
       - postgres
       - kafka
       - mongodb
     networks:
       - eccs-network
+    # Traefik routing configuration
     labels:
       - "traefik.enable=true"
+      # Route /api/emails/* to this service
       - "traefik.http.routers.email.rule=Host(`api.localhost`) && PathPrefix(`/api/emails`)"
       - "traefik.http.services.email.loadbalancer.server.port=3001"
+      # Apply JWT authentication middleware
       - "traefik.http.routers.email.middlewares=jwt-auth@file"
+    # Deployment configuration (for scaling)
     deploy:
+      # Number of service replicas
       replicas: 2
+      # Resource constraints
       resources:
         limits:
           cpus: '0.5'
@@ -57,8 +221,30 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+    restart: unless-stopped
 
-  # Auth Service
+  # --------------------------------------------------------------------------
+  # Auth Service - Authentication and Authorization
+  # --------------------------------------------------------------------------
+  # Handles user registration, login, and JWT token management.
+  # Provides token verification endpoint for Traefik forward auth.
+  #
+  # API ENDPOINTS:
+  #   POST /api/auth/register - User registration
+  #   POST /api/auth/login - User login (returns JWT)
+  #   POST /api/auth/refresh - Refresh JWT token
+  #   GET  /api/auth/verify - Verify token (for Traefik)
+  #   POST /api/auth/logout - Invalidate refresh token
+  #
+  # SECURITY:
+  #   - Password hashing with bcrypt
+  #   - JWT tokens with configurable expiration
+  #   - Refresh token rotation
+  #   - Rate limiting via Traefik
+  #
+  # DEPENDENCIES:
+  #   - PostgreSQL: User data storage
+  # --------------------------------------------------------------------------
   auth-service:
     build:
       context: ./backend/auth-service
@@ -66,12 +252,16 @@ services:
     container_name: eccs-auth-service
     environment:
       - NODE_ENV=production
+      # PostgreSQL connection for user data
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=eccs_auth
       - POSTGRES_USER=eccs_user
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-eccs_secure_password}
+      # JWT configuration
+      # IMPORTANT: Use a strong, unique secret in production!
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      # Token expiration (short-lived for security)
       - JWT_EXPIRATION=1h
     depends_on:
       - postgres
@@ -79,10 +269,37 @@ services:
       - eccs-network
     labels:
       - "traefik.enable=true"
+      # Public route - no JWT required for auth endpoints
       - "traefik.http.routers.auth.rule=Host(`api.localhost`) && PathPrefix(`/api/auth`)"
       - "traefik.http.services.auth.loadbalancer.server.port=3002"
+    restart: unless-stopped
 
-  # Notification Service (Kafka Consumer)
+  # --------------------------------------------------------------------------
+  # Notification Service - Kafka Consumer
+  # --------------------------------------------------------------------------
+  # Consumes email events from Kafka and handles actual email delivery.
+  # Implements retry logic with exponential backoff.
+  #
+  # KAFKA TOPICS:
+  #   - email-notifications: Primary consumption
+  #   - email-notifications-retry: Retry queue
+  #   - email-notifications-dlq: Dead letter queue
+  #
+  # FEATURES:
+  #   - SMTP email delivery
+  #   - Configurable retry attempts
+  #   - Dead letter queue for failed messages
+  #   - MongoDB audit logging
+  #
+  # SECURITY:
+  #   - SMTP credentials via environment
+  #   - No external API exposure
+  #
+  # DEPENDENCIES:
+  #   - Kafka: Event consumption
+  #   - MongoDB: Audit logging
+  #   - SMTP server: Email delivery
+  # --------------------------------------------------------------------------
   notification-service:
     build:
       context: ./backend/notification-service
@@ -90,171 +307,444 @@ services:
     container_name: eccs-notification-service
     environment:
       - NODE_ENV=production
+      # Kafka connection
       - KAFKA_BROKERS=kafka:9092
+      # Consumer group for load balancing across instances
       - KAFKA_GROUP_ID=notification-group
+      # MongoDB for logging
       - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
+      # SMTP configuration for email delivery
       - SMTP_HOST=${SMTP_HOST:-smtp.example.com}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-user@example.com}
       - SMTP_PASS=${SMTP_PASS:-password}
+      # Retry configuration
       - RETRY_ATTEMPTS=3
       - RETRY_DELAY=5000
+      # Distributed tracing
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
     depends_on:
       - kafka
       - mongodb
     networks:
       - eccs-network
+    # No Traefik routing - internal service only
     deploy:
       replicas: 2
       resources:
         limits:
           cpus: '0.5'
           memory: 512M
+    restart: unless-stopped
 
-  # PostgreSQL Database
+  # ==========================================================================
+  # DATA LAYER - DATABASES
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL - Primary Relational Database
+  # --------------------------------------------------------------------------
+  # Stores structured data for users and emails.
+  # Uses Alpine image for smaller footprint.
+  #
+  # DATABASES:
+  #   - eccs_auth: User accounts and sessions
+  #   - eccs_email: Email records and templates
+  #
+  # SECURITY:
+  #   - Password authentication required
+  #   - Internal network only (no external port in production)
+  #   - Data encrypted at rest (when volume encryption enabled)
+  #
+  # PERSISTENCE:
+  #   - postgres_data volume for database files
+  #   - Init scripts run on first startup only
+  # --------------------------------------------------------------------------
   postgres:
     image: postgres:15-alpine
     container_name: eccs-postgres
     environment:
+      # Database superuser configuration
       - POSTGRES_USER=eccs_user
+      # Password from environment (required!)
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-eccs_secure_password}
+      # Multiple databases to create (handled by init script)
       - POSTGRES_MULTIPLE_DATABASES=eccs_email,eccs_auth
+    # Volume mounts for data persistence and initialization
     volumes:
+      # Named volume for database files (survives container recreation)
       - postgres_data:/var/lib/postgresql/data
-      - ./database/postgres/init:/docker-entrypoint-initdb.d
+      # Init scripts executed on first container start
+      # Scripts run in alphabetical order
+      - ./database/postgres/init:/docker-entrypoint-initdb.d:ro
+    # Port mapping (consider removing in production)
     ports:
       - "5432:5432"
     networks:
       - eccs-network
+    # Health check for readiness detection
     healthcheck:
+      # pg_isready is the standard PostgreSQL health check tool
       test: ["CMD-SHELL", "pg_isready -U eccs_user"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
-  # MongoDB for Logging
+  # --------------------------------------------------------------------------
+  # MongoDB - Document Database for Logging
+  # --------------------------------------------------------------------------
+  # Stores unstructured data: logs, audit trails, and metrics.
+  # Optimized for high write throughput.
+  #
+  # COLLECTIONS:
+  #   - email_logs: Email processing history
+  #   - application_logs: Centralized application logging
+  #   - audit_events: Security audit trail
+  #
+  # SECURITY:
+  #   - Authentication can be enabled for production
+  #   - Internal network only
+  #
+  # PERSISTENCE:
+  #   - mongodb_data volume for database files
+  # --------------------------------------------------------------------------
   mongodb:
     image: mongo:6
     container_name: eccs-mongodb
+    # Optional: Enable authentication in production
+    # environment:
+    #   - MONGO_INITDB_ROOT_USERNAME=admin
+    #   - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_PASSWORD:-mongodb_password}
     volumes:
+      # Named volume for data persistence
       - mongodb_data:/data/db
-      - ./database/mongodb/init:/docker-entrypoint-initdb.d
+      # Init scripts for collection and index creation
+      - ./database/mongodb/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "27017:27017"
     networks:
       - eccs-network
     healthcheck:
+      # MongoDB ping command for health verification
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
-  # Kafka
+  # ==========================================================================
+  # DATA LAYER - MESSAGE STREAMING
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # Zookeeper - Kafka Coordination
+  # --------------------------------------------------------------------------
+  # Provides distributed coordination for Kafka cluster.
+  # Required for Kafka broker operation.
+  #
+  # RESPONSIBILITIES:
+  #   - Kafka broker registration
+  #   - Leader election
+  #   - Configuration management
+  #
+  # NOTE: For Kafka 3.x+, consider using KRaft mode (no Zookeeper)
+  # --------------------------------------------------------------------------
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     container_name: eccs-zookeeper
     environment:
+      # Client connection port
       ZOOKEEPER_CLIENT_PORT: 2181
+      # Heartbeat interval in milliseconds
       ZOOKEEPER_TICK_TIME: 2000
+      # Init and sync limits for cluster formation
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
     volumes:
+      # Persistent storage for Zookeeper data
       - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
     networks:
       - eccs-network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
+  # --------------------------------------------------------------------------
+  # Kafka - Message Broker
+  # --------------------------------------------------------------------------
+  # Provides reliable, scalable message streaming.
+  # Used for asynchronous communication between services.
+  #
+  # TOPICS:
+  #   - email-notifications: Primary email event stream
+  #   - email-notifications-retry: Retry queue
+  #   - email-notifications-dlq: Dead letter queue
+  #
+  # CONFIGURATION:
+  #   - Single broker for development
+  #   - Auto-create topics enabled
+  #   - 3 partitions per topic for parallelism
+  # --------------------------------------------------------------------------
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     container_name: eccs-kafka
     depends_on:
       - zookeeper
     ports:
+      # Client connection port
       - "9092:9092"
     environment:
+      # Unique broker identifier
       KAFKA_BROKER_ID: 1
+      # Zookeeper connection string
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Advertised listeners for client connections
+      # PLAINTEXT for internal, optionally add EXTERNAL for host access
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      # Replication factor for internal topics (1 for single broker)
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # Auto-create topics when producer first writes
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Default partitions for auto-created topics
+      KAFKA_NUM_PARTITIONS: 3
+      # Log retention (7 days)
+      KAFKA_LOG_RETENTION_HOURS: 168
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:
       - eccs-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
 
-  # Traefik API Gateway
+  # ==========================================================================
+  # API GATEWAY
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # Traefik - API Gateway and Reverse Proxy
+  # --------------------------------------------------------------------------
+  # Central entry point for all HTTP traffic.
+  # Provides routing, load balancing, and security.
+  #
+  # FEATURES:
+  #   - Dynamic routing based on container labels
+  #   - JWT authentication (forward auth to auth-service)
+  #   - Rate limiting per IP
+  #   - TLS termination (production)
+  #   - Request tracing with Jaeger
+  #   - Metrics for Prometheus
+  #
+  # DASHBOARD:
+  #   - Available at http://localhost:8080
+  #   - Shows routers, services, and middlewares
+  #
+  # PODMAN NOTE:
+  #   Uses container socket for dynamic discovery.
+  #   Set CONTAINER_SOCK=/run/podman/podman.sock for Podman.
+  # --------------------------------------------------------------------------
   traefik:
     image: traefik:v3.0
     container_name: eccs-traefik
+    # Command-line configuration (overrides static config)
     command:
+      # Enable API and dashboard
       - "--api.dashboard=true"
       - "--api.insecure=true"
+      # Enable Docker/Podman provider for dynamic configuration
       - "--providers.docker=true"
+      # Don't expose containers by default (require labels)
       - "--providers.docker.exposedbydefault=false"
+      # Dynamic configuration from files
       - "--providers.file.directory=/etc/traefik/dynamic"
+      # Watch for file changes
+      - "--providers.file.watch=true"
+      # HTTP entrypoint
       - "--entrypoints.web.address=:80"
+      # HTTPS entrypoint
       - "--entrypoints.websecure.address=:443"
+      # Enable ping for health checks
+      - "--ping=true"
+      # Logging configuration
       - "--log.level=INFO"
+      - "--log.format=json"
+      # Access logging
       - "--accesslog=true"
+      - "--accesslog.format=json"
+      # Jaeger tracing integration
       - "--tracing.jaeger=true"
       - "--tracing.jaeger.samplingServerURL=http://jaeger:5778/sampling"
       - "--tracing.jaeger.localAgentHostPort=jaeger:6831"
+      # Prometheus metrics
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
     ports:
+      # HTTP
       - "80:80"
+      # HTTPS
       - "443:443"
+      # Dashboard/API
       - "8080:8080"
     volumes:
-      # For Podman: Use /run/podman/podman.sock, for Docker: use /var/run/docker.sock
+      # Container socket for dynamic service discovery
+      # For Podman: /run/podman/podman.sock
+      # For Docker: /var/run/docker.sock
       - ${CONTAINER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro
-      - ./infrastructure/traefik:/etc/traefik/dynamic
+      # Dynamic configuration files
+      - ./infrastructure/traefik:/etc/traefik/dynamic:ro
     networks:
       - eccs-network
     labels:
       - "traefik.enable=true"
+      # Dashboard routing
       - "traefik.http.routers.dashboard.rule=Host(`traefik.localhost`)"
       - "traefik.http.routers.dashboard.service=api@internal"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
-  # ELK Stack - Elasticsearch
+  # ==========================================================================
+  # OBSERVABILITY STACK - ELK (Elasticsearch, Logstash, Kibana)
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # Elasticsearch - Search and Analytics Engine
+  # --------------------------------------------------------------------------
+  # Stores and indexes log data from all services.
+  # Provides full-text search and aggregation capabilities.
+  #
+  # INDICES:
+  #   - eccs-logs-YYYY.MM.dd: Daily log indices
+  #
+  # CONFIGURATION:
+  #   - Single-node mode for development
+  #   - Security disabled (enable for production)
+  #   - 512MB heap size
+  #
+  # MEMORY NOTE:
+  #   Elasticsearch requires adequate memory. Adjust ES_JAVA_OPTS
+  #   based on available resources (heap should be 50% of container memory).
+  # --------------------------------------------------------------------------
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     container_name: eccs-elasticsearch
     environment:
+      # Single-node discovery (no cluster)
       - discovery.type=single-node
+      # Disable security for development (ENABLE IN PRODUCTION!)
       - xpack.security.enabled=false
+      # JVM heap size (adjust based on available memory)
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      # Cluster name
+      - cluster.name=eccs-logging
     volumes:
+      # Persistent storage for indices
       - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
+      # REST API
       - "9200:9200"
     networks:
       - eccs-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      # Check cluster health (yellow is OK for single-node)
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health?wait_for_status=yellow || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    # Ulimits for Elasticsearch performance
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
 
-  # ELK Stack - Logstash
+  # --------------------------------------------------------------------------
+  # Logstash - Log Processing Pipeline
+  # --------------------------------------------------------------------------
+  # Receives, transforms, and routes logs to Elasticsearch.
+  # Central aggregation point for all application logs.
+  #
+  # INPUTS:
+  #   - TCP port 5000: JSON logs from applications
+  #   - Beats port 5044: Filebeat agents
+  #
+  # PROCESSING:
+  #   - JSON parsing
+  #   - Timestamp normalization
+  #   - GeoIP enrichment
+  #   - Service tagging
+  # --------------------------------------------------------------------------
   logstash:
     image: docker.elastic.co/logstash/logstash:8.11.0
     container_name: eccs-logstash
     volumes:
-      - ./infrastructure/elk/logstash/pipeline:/usr/share/logstash/pipeline
-      - ./infrastructure/elk/logstash/config:/usr/share/logstash/config
+      # Pipeline configuration
+      - ./infrastructure/elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      # Logstash settings
+      - ./infrastructure/elk/logstash/config:/usr/share/logstash/config:ro
     ports:
+      # Beats input
       - "5044:5044"
+      # TCP input for JSON logs
       - "5000:5000"
     environment:
+      # JVM heap size
       - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+      # Elasticsearch output URL
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     depends_on:
       - elasticsearch
     networks:
       - eccs-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9600/_node/stats/pipelines"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
 
-  # ELK Stack - Kibana
+  # --------------------------------------------------------------------------
+  # Kibana - Log Visualization
+  # --------------------------------------------------------------------------
+  # Web interface for exploring and visualizing Elasticsearch data.
+  # Pre-configured with ECCS dashboards.
+  #
+  # FEATURES:
+  #   - Log search and filtering
+  #   - Custom dashboards
+  #   - Alerting (with X-Pack)
+  # --------------------------------------------------------------------------
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: eccs-kibana
     environment:
+      # Elasticsearch connection
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      # Server configuration
+      - SERVER_HOST=0.0.0.0
+      # Disable telemetry
+      - TELEMETRY_ENABLED=false
     ports:
       - "5601:5601"
     depends_on:
@@ -265,20 +755,49 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.kibana.rule=Host(`kibana.localhost`)"
       - "traefik.http.services.kibana.loadbalancer.server.port=5601"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5601/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
 
-  # Grafana Monitoring
+  # ==========================================================================
+  # OBSERVABILITY STACK - METRICS AND TRACING
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # Grafana - Metrics Visualization
+  # --------------------------------------------------------------------------
+  # Unified dashboard for metrics, logs, and traces.
+  # Pre-configured with Prometheus, Elasticsearch, and Jaeger datasources.
+  #
+  # DASHBOARDS:
+  #   - ECCS Overview: System-wide metrics
+  #   - Service Health: Per-service metrics
+  #   - Email Metrics: Email processing stats
+  # --------------------------------------------------------------------------
   grafana:
     image: grafana/grafana:10.2.0
     container_name: eccs-grafana
     environment:
+      # Admin credentials (CHANGE IN PRODUCTION!)
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      # Disable user signup
       - GF_USERS_ALLOW_SIGN_UP=false
+      # Disable anonymous access
+      - GF_AUTH_ANONYMOUS_ENABLED=false
     volumes:
+      # Persistent storage for dashboards and settings
       - grafana_data:/var/lib/grafana
-      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning
-      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards
+      # Datasource provisioning
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+      # Dashboard JSON files
+      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
+      # Note: Port 3030 to avoid conflict with frontend on 3000
       - "3030:3000"
     depends_on:
       - prometheus
@@ -288,48 +807,150 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.grafana.rule=Host(`grafana.localhost`)"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
 
-  # Prometheus for metrics
+  # --------------------------------------------------------------------------
+  # Prometheus - Metrics Collection
+  # --------------------------------------------------------------------------
+  # Scrapes and stores time-series metrics from all services.
+  # Provides PromQL for querying and alerting.
+  #
+  # SCRAPE TARGETS:
+  #   - email-service:3001/metrics
+  #   - auth-service:3002/metrics
+  #   - notification-service:3003/metrics
+  #   - traefik:8080/metrics
+  # --------------------------------------------------------------------------
   prometheus:
     image: prom/prometheus:v2.47.0
     container_name: eccs-prometheus
     volumes:
-      - ./infrastructure/grafana/prometheus.yml:/etc/prometheus/prometheus.yml
+      # Prometheus configuration
+      - ./infrastructure/grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Persistent storage for metrics data
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     command:
+      # Configuration file location
       - '--config.file=/etc/prometheus/prometheus.yml'
+      # Data storage path
       - '--storage.tsdb.path=/prometheus'
+      # Retention period (15 days)
+      - '--storage.tsdb.retention.time=15d'
+      # Enable lifecycle API for reloading config
+      - '--web.enable-lifecycle'
     networks:
       - eccs-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
 
-  # Jaeger for Distributed Tracing
+  # --------------------------------------------------------------------------
+  # Jaeger - Distributed Tracing
+  # --------------------------------------------------------------------------
+  # Collects and visualizes distributed traces across services.
+  # Helps debug request flows and identify bottlenecks.
+  #
+  # INTEGRATION:
+  #   - Services send traces via Jaeger client libraries
+  #   - Traefik forwards trace context headers
+  #   - Grafana links to Jaeger for trace visualization
+  # --------------------------------------------------------------------------
   jaeger:
     image: jaegertracing/all-in-one:1.51
     container_name: eccs-jaeger
     environment:
+      # Enable OpenTelemetry Protocol
       - COLLECTOR_OTLP_ENABLED=true
+      # Memory storage (use Elasticsearch for production)
+      - SPAN_STORAGE_TYPE=memory
     ports:
+      # Jaeger UI
       - "16686:16686"
+      # Collector HTTP endpoint
       - "14268:14268"
+      # Agent UDP (compact thrift)
       - "6831:6831/udp"
+      # OTLP gRPC
+      - "4317:4317"
+      # OTLP HTTP
+      - "4318:4318"
     networks:
       - eccs-network
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.jaeger.rule=Host(`jaeger.localhost`)"
       - "traefik.http.services.jaeger.loadbalancer.server.port=16686"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:14269/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
+# ============================================================================
+# NETWORKS
+# ============================================================================
+# Define the networks used by the services.
+# All services are on the same network for inter-container communication.
 networks:
+  # Main application network
   eccs-network:
+    # Bridge driver for single-host networking
     driver: bridge
+    # Network name (optional, defaults to project_network)
+    name: eccs-network
+    # IPAM configuration (optional)
+    # ipam:
+    #   config:
+    #     - subnet: 172.28.0.0/16
 
+# ============================================================================
+# VOLUMES
+# ============================================================================
+# Named volumes for persistent data storage.
+# Data survives container recreation but NOT volume removal.
+#
+# BACKUP RECOMMENDATION:
+#   Regularly backup these volumes, especially:
+#   - postgres_data: User and email data
+#   - mongodb_data: Audit logs
+#
+# PODMAN NOTE:
+#   Volumes are stored in ~/.local/share/containers/storage/volumes/
+#   for rootless Podman.
+# ============================================================================
 volumes:
+  # PostgreSQL database files
   postgres_data:
+    name: eccs_postgres_data
+  # MongoDB database files
   mongodb_data:
+    name: eccs_mongodb_data
+  # Zookeeper data and logs
   zookeeper_data:
+    name: eccs_zookeeper_data
+  zookeeper_log:
+    name: eccs_zookeeper_log
+  # Kafka log segments
   kafka_data:
+    name: eccs_kafka_data
+  # Elasticsearch indices
   elasticsearch_data:
+    name: eccs_elasticsearch_data
+  # Grafana dashboards and settings
   grafana_data:
+    name: eccs_grafana_data
+  # Prometheus metrics
   prometheus_data:
+    name: eccs_prometheus_data

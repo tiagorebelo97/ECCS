@@ -1,11 +1,48 @@
+# ============================================================================
+# Grafana Dashboard Provisioning - ECCS Platform
+# ============================================================================
+# Auto-loads dashboards from the filesystem on Grafana startup.
+# Dashboards are stored in /var/lib/grafana/dashboards/
+#
+# USAGE:
+#   - Place dashboard JSON files in the dashboards directory
+#   - Dashboards are loaded on Grafana startup
+#   - UI edits don't persist unless exported to file
+#
+# DASHBOARD FILES:
+#   - eccs-overview.json: System overview with all services
+#   - email-service.json: Email service metrics and logs
+#   - infrastructure.json: Database and Kafka metrics
+# ============================================================================
+
 apiVersion: 1
 
 providers:
+  # -------------------------------------------------------------------------
+  # ECCS Dashboards Provider
+  # -------------------------------------------------------------------------
+  # Loads all ECCS monitoring dashboards from the dashboards directory.
+  # Dashboards appear in the "ECCS" folder in the Grafana UI.
+  # -------------------------------------------------------------------------
   - name: 'ECCS Dashboards'
+    # Organization ID (1 is the default org)
     orgId: 1
+    # Folder name in Grafana UI (organizes dashboards)
     folder: 'ECCS'
+    # Folder UID (auto-generated if not specified)
+    folderUid: 'eccs'
+    # Provider type (file-based provisioning)
     type: file
+    # Allow dashboard deletion from UI
     disableDeletion: false
+    # Check for changes every N seconds (0 = only on startup)
+    updateIntervalSeconds: 30
+    # Allow editing in UI (changes won't persist to disk)
+    allowUiUpdates: true
     editable: true
     options:
+      # Path to dashboard JSON files (inside container)
+      # Mount your dashboards directory to this path
       path: /var/lib/grafana/dashboards
+      # Create folders based on filesystem structure
+      foldersFromFilesStructure: false

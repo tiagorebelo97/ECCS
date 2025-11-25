@@ -1,0 +1,64 @@
+# ============================================================================
+# Logstash Configuration for ECCS Platform
+# ============================================================================
+# Main Logstash configuration file controlling global settings.
+# Pipeline-specific settings are in pipeline/*.conf files.
+# ============================================================================
+
+# -----------------------------------------------------------------------------
+# Node Settings
+# -----------------------------------------------------------------------------
+# Name for this Logstash instance
+node.name: eccs-logstash
+
+# -----------------------------------------------------------------------------
+# Network Settings
+# -----------------------------------------------------------------------------
+# HTTP API bind address
+http.host: "0.0.0.0"
+# HTTP API port
+http.port: 9600
+
+# -----------------------------------------------------------------------------
+# Pipeline Settings
+# -----------------------------------------------------------------------------
+# Number of workers (threads) per pipeline
+pipeline.workers: 2
+# Batch size for processing events
+pipeline.batch.size: 125
+# Delay before delivering undersized batches
+pipeline.batch.delay: 50
+
+# Enable ordered processing (important for time-series data)
+pipeline.ordered: auto
+
+# -----------------------------------------------------------------------------
+# Path Settings
+# -----------------------------------------------------------------------------
+# Where to store Logstash data
+path.data: /usr/share/logstash/data
+# Where to write Logstash logs
+path.logs: /var/log/logstash
+
+# -----------------------------------------------------------------------------
+# Logging Settings
+# -----------------------------------------------------------------------------
+# Log level (trace, debug, info, warn, error, fatal)
+log.level: info
+# Log format (plain or json)
+log.format: json
+
+# -----------------------------------------------------------------------------
+# Monitoring Settings
+# -----------------------------------------------------------------------------
+# Enable internal metrics collection
+monitoring.enabled: true
+# Elasticsearch hosts for monitoring data (if X-Pack monitoring)
+# xpack.monitoring.elasticsearch.hosts: ["http://elasticsearch:9200"]
+
+# -----------------------------------------------------------------------------
+# Dead Letter Queue Settings
+# -----------------------------------------------------------------------------
+# Enable dead letter queue for failed events
+dead_letter_queue.enable: false
+# dead_letter_queue.max_bytes: 1024mb

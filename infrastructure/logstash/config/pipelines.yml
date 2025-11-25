@@ -1,0 +1,12 @@
+# ============================================================================
+# Logstash Pipeline Configuration
+# ============================================================================
+# Defines available pipelines for log processing.
+# Each pipeline can have its own configuration and resources.
+# ============================================================================
+
+# Main pipeline for ECCS logs
+- pipeline.id: eccs-main
+  path.config: "/usr/share/logstash/pipeline/main.conf"
+  pipeline.workers: 2
+  pipeline.batch.size: 125
