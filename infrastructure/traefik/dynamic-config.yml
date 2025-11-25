@@ -1,0 +1,100 @@
+# Dynamic configuration for Traefik
+
+http:
+  middlewares:
+    # JWT Authentication middleware
+    jwt-auth:
+      forwardAuth:
+        address: "http://auth-service:3002/api/auth/verify"
+        authResponseHeaders:
+          - "X-User-Id"
+          - "X-User-Email"
+
+    # Rate limiting
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1m
+
+    # Security headers
+    security-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList:
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+        frameDeny: true
+        sslRedirect: false
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+
+    # Retry middleware
+    retry:
+      retry:
+        attempts: 3
+        initialInterval: 100ms
+
+    # Circuit breaker
+    circuit-breaker:
+      circuitBreaker:
+        expression: "NetworkErrorRatio() > 0.30"
+
+  # Service configurations
+  services:
+    email-service:
+      loadBalancer:
+        servers:
+          - url: "http://email-service:3001"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://auth-service:3002"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+
+  routers:
+    email-router:
+      rule: "PathPrefix(`/api/emails`)"
+      service: email-service
+      middlewares:
+        - jwt-auth
+        - rate-limit
+        - security-headers
+        - retry
+
+    auth-router:
+      rule: "PathPrefix(`/api/auth`)"
+      service: auth-service
+      middlewares:
+        - rate-limit
+        - security-headers
+
+# TCP/TLS configuration (optional)
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
