@@ -1,14 +1,1 @@
-{
-  "_comment": "ECCS Kibana Saved Objects - Import via Kibana UI or API",
-  "objects": [
-    {
-      "type": "index-pattern",
-      "id": "eccs-logs-*",
-      "attributes": {
-        "title": "eccs-logs-*",
-        "timeFieldName": "@timestamp"
-      }
-    }
-  ],
-  "version": "8.11.0"
-}
+{"attributes":{"description":"General ECCS logs index pattern for real-time log ingestion via TCP/Beats.","name":"eccs-logs-*","runtimeFieldMap":"{}","sourceFilters":"[]","timeFieldName":"@timestamp","title":"eccs-logs-*","typeMeta":"{}"},"coreMigrationVersion":"8.8.0","created_at":"2024-01-01T00:00:00.000Z","id":"eccs-logs-pattern","managed":false,"references":[],"type":"index-pattern","updated_at":"2024-01-01T00:00:00.000Z","version":"WzAsMV0="}

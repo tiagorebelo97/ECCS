@@ -3,6 +3,14 @@
 # ============================================================================
 # Main Logstash configuration file controlling global settings.
 # Pipeline-specific settings are in pipeline/*.conf files.
+#
+# PIPELINES OVERVIEW:
+#   1. eccs-main: Real-time log ingestion (TCP:5000, Beats:5044)
+#   2. eccs-mongodb: MongoDB email logs to Elasticsearch
+#
+# ENVIRONMENT VARIABLES:
+#   ELASTICSEARCH_HOSTS: Elasticsearch cluster URL (default: http://elasticsearch:9200)
+#   MONGODB_URI: MongoDB connection string (default: mongodb://mongodb:27017/eccs_logs)
 # ============================================================================
 
 # -----------------------------------------------------------------------------
