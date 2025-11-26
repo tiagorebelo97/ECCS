@@ -643,7 +643,9 @@ services:
       # Dynamic Configuration - File Provider
       # -----------------------------------------------------------------------
       # Loads middlewares, TLS options, and static service definitions
-      - "--providers.file.directory=/etc/traefik/dynamic"
+      # NOTE: Using filename instead of directory to avoid parsing traefik.yml
+      # which contains Docker-specific template syntax ({{ normalize .Name }})
+      - "--providers.file.filename=/etc/traefik/dynamic/dynamic-config.yml"
       - "--providers.file.watch=true"
       # -----------------------------------------------------------------------
       # Entrypoints - Network Entry Points
