@@ -116,7 +116,7 @@ docker-compose -f podman-compose.yml up -d
 | Grafana | http://localhost:3030 |
 | Kibana | http://localhost:5601 |
 | Jaeger | http://localhost:16686 |
-| Prometheus | http://localhost:9090 |
+| Prometheus | http://localhost:9091 |
 
 ## 📁 Project Structure
 

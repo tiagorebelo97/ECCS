@@ -68,7 +68,7 @@ podman-compose logs -f email-service
 | Grafana | http://localhost:3030 |
 | Kibana | http://localhost:5601 |
 | Jaeger | http://localhost:16686 |
-| Prometheus | http://localhost:9090 |
+| Prometheus | http://localhost:9091 |
 
 **Note:** The API Gateway uses port 8800 (instead of 80 or 8000) to avoid conflicts with commonly used ports and for rootless Podman compatibility. Privileged ports (< 1024) require root access.
 
