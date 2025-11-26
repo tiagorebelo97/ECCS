@@ -297,8 +297,10 @@ async function sendBatchEmailRequests(emailsWithUsers) {
   });
 
   console.log(`   ✅ Batch delivered successfully`);
-  result.forEach((metadata) => {
-    console.log(`   Partition ${metadata.partition}: offsets ${metadata.baseOffset} - ${metadata.baseOffset + messages.length - 1}`);
+  // Note: In Kafka, batch sends may distribute messages across partitions
+  // Each result entry shows the base offset for messages sent to that partition
+  result.forEach((metadata, index) => {
+    console.log(`   Result ${index + 1}: Partition ${metadata.partition}, base offset ${metadata.baseOffset}`);
   });
 
   return result;
