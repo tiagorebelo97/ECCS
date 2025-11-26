@@ -21,7 +21,7 @@
  *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
  *
  * SES:
- *   AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SES_FROM_EMAIL
+ *   AWS_REGION, AWS_SES_SMTP_USER, AWS_SES_SMTP_PASS, SES_FROM_EMAIL
  *
  * SendGrid:
  *   SENDGRID_API_KEY, SENDGRID_FROM_EMAIL
@@ -34,9 +34,9 @@
  */
 
 const nodemailer = require('nodemailer');
-const mongoose = require('mongoose');
 const logger = require('../config/logger');
 const EmailLog = require('../models/emailLog');
+const Template = require('../models/template');
 
 /**
  * EmailProcessor class handles email delivery through multiple providers.
@@ -111,13 +111,16 @@ class EmailProcessor {
         // Requires AWS credentials and SES-verified sender identity.
         logger.info('Configuring AWS SES transport');
         return nodemailer.createTransport({
-          // Use SES transport (requires aws-sdk or @aws-sdk/client-ses)
-          host: `email.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com`,
-          port: 465,
-          secure: true,
+          // Use SES SMTP interface (requires SMTP credentials, not IAM keys)
+          // SMTP endpoint format: email-smtp.{region}.amazonaws.com
+          host: `email-smtp.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com`,
+          port: 587,
+          secure: false, // Use STARTTLS
           auth: {
-            user: process.env.AWS_ACCESS_KEY_ID,
-            pass: process.env.AWS_SECRET_ACCESS_KEY
+            // AWS SES SMTP credentials (different from IAM credentials)
+            // Generate in AWS SES Console > SMTP Settings
+            user: process.env.AWS_SES_SMTP_USER,
+            pass: process.env.AWS_SES_SMTP_PASS
           },
           // SES-specific options
           connectionTimeout: 10000,  // 10 second connection timeout
@@ -358,11 +361,8 @@ class EmailProcessor {
    */
   async _renderTemplate(templateId, templateData) {
     try {
-      // Import Template model (lazy load to avoid circular dependencies)
-      const Template = mongoose.model('Template');
-
-      // Fetch template from MongoDB
-      const template = await Template.findById(templateId);
+      // Fetch template from MongoDB using the Template model
+      const template = await Template.findOne({ templateId: templateId });
 
       if (!template) {
         logger.warn({
