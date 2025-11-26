@@ -170,8 +170,24 @@ const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
+  /**
+   * REGISTER FUNCTION
+   * 
+   * @param {string} email - User email
+   * @param {string} password - User password
+   * @param {string} name - User display name
+   * @returns {Promise<object>} API response with token and user data
+   */
+  const register = useCallback(async (email, password, name) => {
+    const response = await authApi.register(email, password, name);
+    const { token } = response;
+    localStorage.setItem('token', token);
+    setUser({ token });
+    return response;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, register, loading }}>
       {children}
     </AuthContext.Provider>
   );
@@ -247,7 +263,10 @@ const Navbar = () => {
             </button>
           </>
         ) : (
-          <Link to="/login">Login</Link>
+          <>
+            <Link to="/login">Login</Link>
+            <Link to="/register">Register</Link>
+          </>
         )}
       </nav>
     </header>
@@ -337,6 +356,122 @@ const LoginPage = () => {
         >
           {isLoading ? 'Logging in...' : 'Login'}
         </button>
+        <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+          Don't have an account?{' '}
+          <Link to="/register" style={{ color: 'var(--color-primary)' }}>
+            Create one
+          </Link>
+        </p>
+      </form>
+    </div>
+  );
+};
+
+/**
+ * RegisterPage Component
+ * 
+ * STATE MANAGEMENT:
+ * - email, password, name: Controlled form inputs
+ * - error: Display validation/API errors
+ * 
+ * ACCESSIBILITY:
+ * - Form has proper label associations
+ * - Error messages are announced to screen readers
+ * - Required fields are marked
+ */
+const RegisterPage = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { register, user } = useAuth();
+
+  if (user) {
+    return <Navigate to="/" />;
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      await register(email, password, name);
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="login-container">
+      <form className="login-form" onSubmit={handleSubmit} aria-label="Registration form">
+        <h2>Create Account</h2>
+        {error && (
+          <div className="alert alert-error" role="alert">
+            {error}
+          </div>
+        )}
+        <div className="form-group">
+          <label htmlFor="register-name">Name</label>
+          <input
+            id="register-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter your name"
+            required
+            autoComplete="name"
+            aria-required="true"
+            disabled={isLoading}
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="register-email">Email</label>
+          <input
+            id="register-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            required
+            autoComplete="email"
+            aria-required="true"
+            disabled={isLoading}
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="register-password">Password</label>
+          <input
+            id="register-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password (min 6 characters)"
+            required
+            minLength={6}
+            autoComplete="new-password"
+            aria-required="true"
+            disabled={isLoading}
+          />
+        </div>
+        <button 
+          type="submit" 
+          className="btn btn-primary" 
+          style={{ width: '100%' }}
+          disabled={isLoading}
+          aria-busy={isLoading}
+        >
+          {isLoading ? 'Creating account...' : 'Create Account'}
+        </button>
+        <p style={{ textAlign: 'center', marginTop: '1rem' }}>
+          Already have an account?{' '}
+          <Link to="/login" style={{ color: 'var(--color-primary)' }}>
+            Login
+          </Link>
+        </p>
       </form>
     </div>
   );
@@ -769,6 +904,7 @@ const TemplatesPage = () => {
  * ROUTING STRUCTURE:
  * 
  *   /login      → Public, redirects to / if authenticated
+ *   /register   → Public, redirects to / if authenticated
  *   /           → Protected, Dashboard with stats
  *   /compose    → Protected, Email composition with SendEmailButton
  *   /emails     → Protected, Email history with EmailListView
@@ -789,8 +925,9 @@ function App() {
           
           <div id="main-content">
             <Routes>
-              {/* Public route */}
+              {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
               
               {/* Protected routes */}
               <Route path="/" element={
