@@ -13,7 +13,7 @@
 # ARCHITECTURE:
 #   ┌─────────────────────────────────────────────────────────────────────────┐
 #   │                            Traefik (API Gateway)                        │
-#   │                         Port 80, 443, 8080                              │
+#   │                         Port 8000, 8443, 8080                           │
 #   └────────────────┬────────────────┬───────────────────────────────────────┘
 #                    │                │
 #   ┌────────────────▼────┐  ┌────────▼────────────┐
@@ -113,7 +113,7 @@ services:
       dockerfile: Dockerfile
       # Build arguments for React environment configuration
       args:
-        - REACT_APP_API_URL=http://localhost:80
+        - REACT_APP_API_URL=http://localhost:8000
         - NODE_ENV=production
     container_name: eccs-frontend
     # Port mapping: host:container
@@ -123,7 +123,7 @@ services:
     # Environment variables for runtime configuration
     environment:
       # API URL (used by nginx proxy, not React build)
-      - REACT_APP_API_URL=http://traefik:80
+      - REACT_APP_API_URL=http://traefik:8000
     # Service dependencies - frontend starts after traefik
     depends_on:
       - traefik
@@ -432,7 +432,7 @@ services:
   #   - metrics: 30-day retention (expireAfterSeconds: 2592000)
   # --------------------------------------------------------------------------
   mongodb:
-    image: mongo:6
+    image: docker.io/library/mongo:6
     container_name: eccs-mongodb
     # Optional: Enable authentication in production
     # environment:
@@ -636,10 +636,10 @@ services:
       # -----------------------------------------------------------------------
       # Entrypoints - Network Entry Points
       # -----------------------------------------------------------------------
-      # HTTP entrypoint (port 80)
-      - "--entrypoints.web.address=:80"
-      # HTTPS entrypoint (port 443) - TLS termination
-      - "--entrypoints.websecure.address=:443"
+      # HTTP entrypoint (port 8000 for rootless Podman compatibility)
+      - "--entrypoints.web.address=:8000"
+      # HTTPS entrypoint (port 8443 for rootless Podman compatibility)
+      - "--entrypoints.websecure.address=:8443"
       # -----------------------------------------------------------------------
       # Health Check Endpoint
       # -----------------------------------------------------------------------
@@ -665,10 +665,10 @@ services:
       - "--metrics.prometheus.addEntryPointsLabels=true"
       - "--metrics.prometheus.addServicesLabels=true"
     ports:
-      # HTTP - Main web traffic
-      - "80:80"
-      # HTTPS - Secure web traffic with TLS termination
-      - "443:443"
+      # HTTP - Main web traffic (port 8000 for rootless Podman compatibility)
+      - "8000:8000"
+      # HTTPS - Secure web traffic with TLS termination (port 8443 for rootless Podman)
+      - "8443:8443"
       # Dashboard/API - Internal monitoring (restrict in production)
       - "8080:8080"
     volumes:
@@ -960,7 +960,7 @@ services:
   #   - traefik:8080/metrics
   # --------------------------------------------------------------------------
   prometheus:
-    image: prom/prometheus:v2.47.0
+    image: docker.io/prom/prometheus:v2.47.0
     container_name: eccs-prometheus
     volumes:
       # Prometheus configuration
@@ -1003,7 +1003,7 @@ services:
   #   - Grafana links to Jaeger for trace visualization
   # --------------------------------------------------------------------------
   jaeger:
-    image: jaegertracing/all-in-one:1.51
+    image: docker.io/jaegertracing/all-in-one:1.51
     container_name: eccs-jaeger
     environment:
       # Enable OpenTelemetry Protocol

@@ -59,16 +59,20 @@ ping:
 # Entrypoints are the network entry points into Traefik.
 # Each entrypoint listens on a specific port and protocol.
 #
+# PODMAN COMPATIBILITY:
+#   Ports 8000 and 8443 are used instead of 80 and 443 for rootless
+#   Podman compatibility. Privileged ports (< 1024) require root access.
+#
 # SECURITY ARCHITECTURE:
-#   - web (80): HTTP traffic, can redirect to HTTPS
-#   - websecure (443): HTTPS traffic with TLS termination
+#   - web (8000): HTTP traffic, can redirect to HTTPS
+#   - websecure (8443): HTTPS traffic with TLS termination
 #   - traefik (8080): Internal dashboard and metrics (restrict in production)
 entryPoints:
-  # HTTP entrypoint (port 80)
+  # HTTP entrypoint (port 8000)
   # ROUTING: Handles unencrypted HTTP traffic
   # SECURITY: In production, redirect all HTTP to HTTPS
   web:
-    address: ":80"
+    address: ":8000"
     # HTTP to HTTPS redirection (uncomment in production)
     # SECURITY: Forces all traffic through encrypted channel
     # http:
@@ -78,11 +82,11 @@ entryPoints:
     #       scheme: https
     #       permanent: true
 
-  # HTTPS entrypoint (port 443)
+  # HTTPS entrypoint (port 8443)
   # ROUTING: Handles encrypted HTTPS traffic with TLS termination
   # SECURITY: TLS configuration defined in dynamic config
   websecure:
-    address: ":443"
+    address: ":8443"
     # HTTP/2 settings for improved performance
     http2:
       maxConcurrentStreams: 250
