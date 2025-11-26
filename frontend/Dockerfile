@@ -92,11 +92,14 @@ RUN apk update && \
     apk upgrade --no-cache && \
     apk add --no-cache dumb-init && \
     # Remove default nginx configurations that we'll replace
-    rm -rf /etc/nginx/conf.d/default.conf && \
-    # Create directory for nginx to store temp files (needed for non-root)
-    mkdir -p /var/cache/nginx /var/run/nginx && \
+    # NOTE: Explicitly remove both the main nginx.conf and default server config
+    # to ensure our custom rootless-compatible configs take effect
+    rm -f /etc/nginx/nginx.conf && \
+    rm -f /etc/nginx/conf.d/default.conf && \
+    # Create cache directory for nginx temp files (needed for non-root operation)
+    mkdir -p /var/cache/nginx && \
     # Ensure nginx user owns required directories for rootless operation
-    chown -R nginx:nginx /var/cache/nginx /var/run/nginx /var/log/nginx
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx
 
 # Copy built React application from builder stage
 # --chown ensures files are owned by nginx user for security
