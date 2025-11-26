@@ -438,12 +438,16 @@ http:
 tls:
   # Certificate stores for self-signed or CA certificates
   # SECURITY: Store certificates securely with restricted file permissions
-  certificates:
-    - certFile: /etc/traefik/certs/eccs.crt
-      keyFile: /etc/traefik/certs/eccs.key
-      # Optional: Specify stores for certificate organization
-      # stores:
-      #   - default
+  #
+  # NOTE: Certificates are optional for development. They will be auto-generated
+  # by scripts/start.sh if they don't exist. If you want to use HTTPS without
+  # running the start script, first generate certificates with:
+  #   cd infrastructure/traefik/certs && ./generate-certs.sh
+  #
+  # Uncomment the certificates section below if you have generated certificates:
+  # certificates:
+  #   - certFile: /etc/traefik/certs/eccs.crt
+  #     keyFile: /etc/traefik/certs/eccs.key
 
   # TLS options profiles
   options:
@@ -474,9 +478,10 @@ tls:
       # No explicit cipher suite configuration needed for TLS 1.3
 
   # Default certificate store
-  stores:
-    default:
-      # Default certificate used when SNI doesn't match
-      defaultCertificate:
-        certFile: /etc/traefik/certs/eccs.crt
-        keyFile: /etc/traefik/certs/eccs.key
+  # NOTE: Commented out since certificates are optional for development
+  # Uncomment if you have generated certificates:
+  # stores:
+  #   default:
+  #     defaultCertificate:
+  #       certFile: /etc/traefik/certs/eccs.crt
+  #       keyFile: /etc/traefik/certs/eccs.key

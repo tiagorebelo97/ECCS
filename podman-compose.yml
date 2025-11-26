@@ -196,11 +196,14 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
       # Jaeger endpoint for distributed tracing
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
-    # Service startup order
+    # Service startup order - wait for healthy dependencies
     depends_on:
-      - postgres
-      - kafka
-      - mongodb
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
     networks:
       - eccs-network
     # Traefik routing configuration
@@ -266,7 +269,8 @@ services:
       # Token expiration (short-lived for security)
       - JWT_EXPIRATION=1h
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - eccs-network
     labels:
@@ -328,9 +332,12 @@ services:
       # Distributed tracing
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
     depends_on:
-      - kafka
-      - mongodb
-      - mailpit
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
     networks:
       - eccs-network
     # No Traefik routing - internal service only
@@ -545,7 +552,8 @@ services:
     image: confluentinc/cp-kafka:7.4.0
     container_name: eccs-kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       # Client connection port
       - "9092:9092"
@@ -826,8 +834,10 @@ services:
       # Used to read email_logs and application_logs collections
       - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
     depends_on:
-      - elasticsearch
-      - mongodb
+      elasticsearch:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
     networks:
       - eccs-network
     healthcheck:
@@ -885,7 +895,8 @@ services:
     ports:
       - "5601:5601"
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     networks:
       - eccs-network
     labels:
@@ -1033,12 +1044,15 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.jaeger.rule=Host(`jaeger.localhost`)"
       - "traefik.http.services.jaeger.loadbalancer.server.port=16686"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:14269/"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    # Healthcheck disabled - Jaeger all-in-one is a scratch-based image without shell
+    # The container will be monitored via its running status
+    # To verify Jaeger is healthy, check http://localhost:14269/ from the host
+    # healthcheck:
+    #   test: ["CMD", "wget", "-q", "--spider", "http://localhost:14269/"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    #   start_period: 30s
     restart: unless-stopped
 
   # --------------------------------------------------------------------------
@@ -1069,17 +1083,20 @@ services:
       # Refresh metadata interval
       - '--refresh.metadata=30s'
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     networks:
       - eccs-network
     ports:
       - "9308:9308"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9308/metrics"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+    # Healthcheck disabled - kafka-exporter is a scratch-based image without shell
+    # The container will be monitored via its running status
+    # healthcheck:
+    #   test: ["CMD", "wget", "-q", "--spider", "http://localhost:9308/metrics"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 30s
     restart: unless-stopped
 
   # --------------------------------------------------------------------------
@@ -1189,7 +1206,9 @@ services:
       - "traefik.http.routers.mailpit.rule=Host(`mailpit.localhost`)"
       - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8025/"]
+      # Mailpit provides a built-in readyz command for healthchecks
+      # This is the recommended way to check Mailpit health since the image is scratch-based
+      test: ["CMD", "/mailpit", "readyz"]
       interval: 30s
       timeout: 10s
       retries: 5
