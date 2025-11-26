@@ -665,11 +665,13 @@ services:
       - "--accesslog=true"
       - "--accesslog.format=json"
       # -----------------------------------------------------------------------
-      # Distributed Tracing - Jaeger Integration
+      # Distributed Tracing - OpenTelemetry Integration
       # -----------------------------------------------------------------------
-      - "--tracing.jaeger=true"
-      - "--tracing.jaeger.samplingServerURL=http://jaeger:5778/sampling"
-      - "--tracing.jaeger.localAgentHostPort=jaeger:6831"
+      # Note: Jaeger tracing backend was removed in Traefik v3.
+      # Use OpenTelemetry (OTLP) protocol to send traces to Jaeger instead.
+      # Jaeger supports OTLP natively via ports 4317 (gRPC) and 4318 (HTTP).
+      - "--tracing.otlp=true"
+      - "--tracing.otlp.http.endpoint=http://jaeger:4318/v1/traces"
       # -----------------------------------------------------------------------
       # Metrics - Prometheus Integration
       # -----------------------------------------------------------------------

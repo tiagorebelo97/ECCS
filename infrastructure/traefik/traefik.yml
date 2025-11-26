@@ -214,21 +214,21 @@ accessLog:
         X-User-Id: keep
 
 # -----------------------------------------------------------------------------
-# Tracing (Jaeger)
+# Tracing (OpenTelemetry)
 # -----------------------------------------------------------------------------
 # OBSERVABILITY: Distributed tracing for request flow visualization.
-# Integrates with Jaeger for end-to-end trace collection across services.
+# Uses OpenTelemetry (OTLP) protocol to send traces to Jaeger.
+#
+# NOTE: The Jaeger tracing backend was removed in Traefik v3.
+# Jaeger supports OTLP natively via ports 4317 (gRPC) and 4318 (HTTP).
+# For more information, see the Traefik v3 migration guide:
+# https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#tracing
 tracing:
-  # Jaeger backend for distributed tracing
-  jaeger:
-    # Sampling server URL for adaptive sampling
-    samplingServerURL: "http://jaeger:5778/sampling"
-    # Local agent for trace collection (UDP)
-    localAgentHostPort: "jaeger:6831"
-    # Trace propagation format (jaeger, b3, w3c)
-    propagation: "jaeger"
-    # Trace context header name
-    traceContextHeaderName: "uber-trace-id"
+  # OpenTelemetry backend for distributed tracing
+  otlp:
+    # OTLP HTTP endpoint (Jaeger supports OTLP on port 4318)
+    http:
+      endpoint: "http://jaeger:4318/v1/traces"
 
 # -----------------------------------------------------------------------------
 # Metrics (Prometheus)
