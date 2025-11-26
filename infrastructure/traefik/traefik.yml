@@ -107,53 +107,31 @@ entryPoints:
 # Providers are infrastructure components that provide configuration to Traefik.
 # Traefik supports multiple providers simultaneously for flexible deployment.
 #
-# DYNAMIC SERVICE DISCOVERY:
-#   Traefik automatically detects Podman/Docker containers and creates
-#   routing rules based on container labels. This enables:
-#   - Zero-downtime deployments (new containers auto-registered)
-#   - Service scaling (multiple replicas auto-discovered)
-#   - Blue-green deployments (swap routing via labels)
+# NOTE: Docker provider is disabled to avoid permission issues with Podman.
+# All service routing is defined via the file provider in dynamic-config.yml.
+# This ensures Traefik works reliably regardless of container runtime.
 #
-# CONTAINER LABEL FORMAT:
+# CONTAINER LABEL FORMAT (for reference, not used when Docker provider is disabled):
 #   - traefik.enable=true                          # Enable container routing
 #   - traefik.http.routers.<name>.rule=...         # Routing rule
 #   - traefik.http.services.<name>.loadbalancer... # Service config
 providers:
   # -------------------------------------------------------------------------
-  # Docker/Podman Provider - Container Discovery
+  # Docker/Podman Provider - DISABLED
   # -------------------------------------------------------------------------
-  # DYNAMIC DISCOVERY: Automatically detects running containers and creates
-  # routing rules based on container labels. Supports both Docker and Podman.
+  # Docker provider is disabled to avoid permission issues when using Podman.
+  # The container socket may not be accessible or may require specific
+  # permissions that are not available in rootless Podman environments.
   #
-  # PODMAN COMPATIBILITY:
-  #   Podman provides a Docker-compatible socket API. Traefik connects to
-  #   either runtime using the same provider configuration.
-  #
-  # SECURITY CONSIDERATIONS:
-  #   - Socket mounted read-only (:ro) to prevent container manipulation
-  #   - exposedByDefault=false requires explicit opt-in via labels
-  #   - Network constraint limits routing to specified network only
-  docker:
-    # Container socket endpoint
-    # PODMAN: Set CONTAINER_SOCK=/run/podman/podman.sock in environment
-    # DOCKER: Set CONTAINER_SOCK=/var/run/docker.sock in environment
-    # The socket path is controlled by the CONTAINER_SOCK environment variable
-    endpoint: "unix:///var/run/docker.sock"
-    # SECURITY: Don't expose containers by default
-    # Containers must explicitly enable routing with traefik.enable=true
-    exposedByDefault: false
-    # Network to use for container communication
-    # ROUTING: Only containers on this network are routable
-    network: eccs-network
-    # Watch for container changes (enables dynamic updates)
-    # DYNAMIC DISCOVERY: New containers automatically added to routing
-    watch: true
-    # Default rule for containers without explicit routing rules
-    # Uses container name as subdomain: <container>.localhost
-    defaultRule: "Host(`{{ normalize .Name }}.localhost`)"
-    # Constraints to limit which containers are discovered
-    # Example: Only discover containers with specific label
-    # constraints: "Label(`traefik.constraint`, `eccs`)"
+  # If you need dynamic service discovery with Podman, configure the
+  # CONTAINER_SOCK environment variable to point to the Podman socket
+  # and ensure proper permissions are set. Then enable the provider below.
+  # docker:
+  #   endpoint: "unix:///var/run/docker.sock"
+  #   exposedByDefault: false
+  #   network: eccs-network
+  #   watch: true
+  #   defaultRule: "Host(`{{ normalize .Name }}.localhost`)"
 
   # -------------------------------------------------------------------------
   # File Provider - Static and Override Configuration
@@ -164,12 +142,10 @@ providers:
   # USAGE:
   #   - Define reusable middlewares (rate limiting, auth, headers)
   #   - Configure TLS certificates and options
-  #   - Override container-discovered configurations
+  #   - Define all service routing (since Docker provider is disabled)
   file:
     # Specific dynamic configuration file to load
-    # NOTE: Using filename instead of directory to avoid parsing the static
-    # traefik.yml file which contains Docker-specific template syntax
-    # (like {{ normalize .Name }}) that the file provider cannot evaluate.
+    # Contains all service definitions, routers, and middlewares
     filename: "/etc/traefik/dynamic/dynamic-config.yml"
     # Watch for file changes (enables hot-reload)
     # DYNAMIC UPDATES: Configuration changes apply without restart

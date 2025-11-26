@@ -284,10 +284,8 @@ http:
   # ---------------------------------------------------------------------------
   # Backend service definitions with load balancing and health checks.
   #
-  # DYNAMIC DISCOVERY:
-  #   Traefik automatically discovers services via Podman/Docker labels.
-  #   These static definitions serve as fallbacks and enable additional
-  #   configuration like health checks and load balancing strategies.
+  # NOTE: Since Docker provider is disabled, all services must be defined here.
+  # These static definitions enable load balancing and health checks.
   #
   # HEALTH CHECKS:
   #   Each service exposes /health endpoint for liveness verification.
@@ -320,16 +318,53 @@ http:
           timeout: 3s
         passHostHeader: true
 
-    # Notification service backend (internal, no external routing)
-    # NOTE: This service consumes from Kafka and doesn't expose HTTP
-    notification-service:
+    # Frontend service
+    # ROUTING: Handles frontend requests to frontend.localhost
+    frontend:
       loadBalancer:
         servers:
-          - url: "http://notification-service:3003"
-        healthCheck:
-          path: /health
-          interval: 10s
-          timeout: 3s
+          - url: "http://frontend:3000"
+        passHostHeader: true
+
+    # Kibana service
+    # ROUTING: Handles requests to kibana.localhost
+    kibana:
+      loadBalancer:
+        servers:
+          - url: "http://kibana:5601"
+        passHostHeader: true
+
+    # Grafana service
+    # ROUTING: Handles requests to grafana.localhost
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://grafana:3000"
+        passHostHeader: true
+
+    # Jaeger service
+    # ROUTING: Handles requests to jaeger.localhost
+    jaeger:
+      loadBalancer:
+        servers:
+          - url: "http://jaeger:16686"
+        passHostHeader: true
+
+    # Mailpit service
+    # ROUTING: Handles requests to mailpit.localhost
+    mailpit:
+      loadBalancer:
+        servers:
+          - url: "http://mailpit:8025"
+        passHostHeader: true
+
+    # Alertmanager service
+    # ROUTING: Handles requests to alertmanager.localhost
+    alertmanager:
+      loadBalancer:
+        servers:
+          - url: "http://alertmanager:9093"
+        passHostHeader: true
 
   # ---------------------------------------------------------------------------
   # Routers
@@ -413,6 +448,84 @@ http:
       priority: 10
       tls:
         options: default
+
+    # -------------------------------------------------------------------------
+    # Frontend Router
+    # -------------------------------------------------------------------------
+    # ROUTING: frontend.localhost -> frontend:3000
+    frontend-router:
+      rule: "Host(`frontend.localhost`)"
+      service: frontend
+      middlewares:
+        - security-headers
+      entryPoints:
+        - web
+      priority: 5
+
+    # -------------------------------------------------------------------------
+    # Kibana Router
+    # -------------------------------------------------------------------------
+    # ROUTING: kibana.localhost -> kibana:5601
+    kibana-router:
+      rule: "Host(`kibana.localhost`)"
+      service: kibana
+      middlewares:
+        - security-headers
+      entryPoints:
+        - web
+      priority: 5
+
+    # -------------------------------------------------------------------------
+    # Grafana Router
+    # -------------------------------------------------------------------------
+    # ROUTING: grafana.localhost -> grafana:3000
+    grafana-router:
+      rule: "Host(`grafana.localhost`)"
+      service: grafana
+      middlewares:
+        - security-headers
+      entryPoints:
+        - web
+      priority: 5
+
+    # -------------------------------------------------------------------------
+    # Jaeger Router
+    # -------------------------------------------------------------------------
+    # ROUTING: jaeger.localhost -> jaeger:16686
+    jaeger-router:
+      rule: "Host(`jaeger.localhost`)"
+      service: jaeger
+      middlewares:
+        - security-headers
+      entryPoints:
+        - web
+      priority: 5
+
+    # -------------------------------------------------------------------------
+    # Mailpit Router
+    # -------------------------------------------------------------------------
+    # ROUTING: mailpit.localhost -> mailpit:8025
+    mailpit-router:
+      rule: "Host(`mailpit.localhost`)"
+      service: mailpit
+      middlewares:
+        - security-headers
+      entryPoints:
+        - web
+      priority: 5
+
+    # -------------------------------------------------------------------------
+    # Alertmanager Router
+    # -------------------------------------------------------------------------
+    # ROUTING: alertmanager.localhost -> alertmanager:9093
+    alertmanager-router:
+      rule: "Host(`alertmanager.localhost`)"
+      service: alertmanager
+      middlewares:
+        - security-headers
+      entryPoints:
+        - web
+      priority: 5
 
 # =============================================================================
 # TLS Configuration
