@@ -1,47 +1,188 @@
+# ============================================================================
+# Prometheus Configuration for ECCS Platform
+# ============================================================================
+# This configuration defines scrape targets, alerting rules, and Alertmanager
+# integration for comprehensive monitoring of the ECCS email platform.
+#
+# METRICS SOURCES:
+#   - Node.js Services: email-service, auth-service, notification-service
+#   - Message Queue: Kafka via kafka-exporter
+#   - API Gateway: Traefik
+#   - Infrastructure: Prometheus self-monitoring
+#
+# ALERTING:
+#   - Rules defined in alerting-rules.yml
+#   - Alerts forwarded to Alertmanager for notification routing
+# ============================================================================
+
 global:
+  # Scrape interval for all jobs (unless overridden)
   scrape_interval: 15s
+  # Evaluation interval for alerting rules
   evaluation_interval: 15s
+  # External labels added to all metrics and alerts
+  external_labels:
+    cluster: 'eccs-production'
+    environment: 'production'
 
-scrape_configs:
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
-
-  - job_name: 'email-service'
-    static_configs:
-      - targets: ['email-service:3001']
-    metrics_path: '/metrics'
-
-  - job_name: 'auth-service'
-    static_configs:
-      - targets: ['auth-service:3002']
-    metrics_path: '/metrics'
-
-  - job_name: 'notification-service'
-    static_configs:
-      - targets: ['notification-service:3003']
-    metrics_path: '/metrics'
-
-  - job_name: 'traefik'
-    static_configs:
-      - targets: ['traefik:8080']
-    metrics_path: '/metrics'
-
-  - job_name: 'kafka'
-    static_configs:
-      - targets: ['kafka:9092']
-
-  - job_name: 'postgres'
-    static_configs:
-      - targets: ['postgres:5432']
-
-  - job_name: 'mongodb'
-    static_configs:
-      - targets: ['mongodb:27017']
-
+# ============================================================================
+# ALERTMANAGER CONFIGURATION
+# ============================================================================
+# Forward alerts to Alertmanager for notification routing and deduplication
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
+        - targets:
+            - 'alertmanager:9093'
+      # Timeout for sending alerts
+      timeout: 10s
+      # API version for Alertmanager
+      api_version: v2
 
-rule_files: []
+# ============================================================================
+# ALERT RULES FILES
+# ============================================================================
+# Load alerting rules from external files for better organization
+rule_files:
+  - '/etc/prometheus/alerting-rules.yml'
+
+# ============================================================================
+# SCRAPE CONFIGURATIONS
+# ============================================================================
+# Define targets for metrics collection from various services
+scrape_configs:
+  # --------------------------------------------------------------------------
+  # Prometheus Self-Monitoring
+  # --------------------------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: '/metrics'
+
+  # ==========================================================================
+  # NODE.JS BACKEND SERVICES
+  # ==========================================================================
+  # All Node.js services expose Prometheus metrics via prom-client library
+  # at the /metrics endpoint.
+
+  # --------------------------------------------------------------------------
+  # Email Service - Email Management API
+  # --------------------------------------------------------------------------
+  # Exposes:
+  #   - http_request_duration_seconds (histogram)
+  #   - Default Node.js metrics (memory, CPU, event loop)
+  - job_name: 'email-service'
+    static_configs:
+      - targets: ['email-service:3001']
+        labels:
+          service: 'email-service'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # --------------------------------------------------------------------------
+  # Auth Service - Authentication and Authorization API
+  # --------------------------------------------------------------------------
+  # Exposes:
+  #   - http_request_duration_seconds (histogram)
+  #   - Default Node.js metrics
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:3002']
+        labels:
+          service: 'auth-service'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # --------------------------------------------------------------------------
+  # Notification Service - Kafka Consumer for Email Delivery
+  # --------------------------------------------------------------------------
+  # Exposes:
+  #   - emails_processed_total (counter) with status labels
+  #   - email_processing_duration_seconds (histogram)
+  #   - email_retry_queue_depth (gauge)
+  #   - Default Node.js metrics
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:3003']
+        labels:
+          service: 'notification-service'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # ==========================================================================
+  # KAFKA METRICS
+  # ==========================================================================
+  # Kafka metrics are exposed via kafka-exporter which connects to Kafka
+  # brokers and exposes consumer group lag, topic metrics, and broker stats.
+
+  # --------------------------------------------------------------------------
+  # Kafka Exporter - Kafka Cluster Metrics
+  # --------------------------------------------------------------------------
+  # Exposes:
+  #   - kafka_consumergroup_lag (gauge) - Consumer lag per partition
+  #   - kafka_topic_partitions (gauge) - Partition count per topic
+  #   - kafka_brokers (gauge) - Number of brokers in cluster
+  #   - kafka_topic_partition_current_offset (gauge) - Current offset
+  #   - kafka_consumergroup_current_offset (gauge) - Consumer group offset
+  - job_name: 'kafka-exporter'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+        labels:
+          service: 'kafka'
+          tier: 'messaging'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # ==========================================================================
+  # API GATEWAY
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # Traefik - Reverse Proxy and Load Balancer
+  # --------------------------------------------------------------------------
+  # Exposes:
+  #   - traefik_service_requests_total (counter)
+  #   - traefik_service_request_duration_seconds (histogram)
+  #   - traefik_entrypoint_requests_total (counter)
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+        labels:
+          service: 'traefik'
+          tier: 'gateway'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # ==========================================================================
+  # INFRASTRUCTURE MONITORING (Optional - requires exporters)
+  # ==========================================================================
+  # These scrape configs are prepared for when database exporters are added.
+  # Uncomment and configure when postgres_exporter and mongodb_exporter are
+  # deployed.
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL Exporter (requires postgres_exporter container)
+  # --------------------------------------------------------------------------
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         service: 'postgres'
+  #         tier: 'database'
+  #   metrics_path: '/metrics'
+  #   scrape_interval: 30s
+
+  # --------------------------------------------------------------------------
+  # MongoDB Exporter (requires mongodb_exporter container)
+  # --------------------------------------------------------------------------
+  # - job_name: 'mongodb'
+  #   static_configs:
+  #     - targets: ['mongodb-exporter:9216']
+  #       labels:
+  #         service: 'mongodb'
+  #         tier: 'database'
+  #   metrics_path: '/metrics'
+  #   scrape_interval: 30s

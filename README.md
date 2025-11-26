@@ -180,16 +180,45 @@ Kafka consumer that processes emails with retry logic.
 
 ### Grafana Dashboards
 Pre-configured dashboards for:
-- Email processing rates
-- API latency (p95, p99)
-- Error rates
-- Kafka consumer lag
+- **ECCS Operations Dashboard** - Comprehensive monitoring with throughput, failures, and queue metrics
+- Email processing rates and success rates
+- API latency (p50, p90, p95, p99)
+- Error rates and DLQ metrics
+- Kafka consumer lag and retry queue depth
+- Service health status
+
+Access at: http://localhost:3030
 
 ### Prometheus Metrics
 Each service exposes `/metrics` endpoint with:
 - HTTP request duration histograms
-- Email processing counters
+- Email processing counters (`emails_processed_total`)
+- Email processing duration (`email_processing_duration_seconds`)
+- Retry queue depth (`email_retry_queue_depth`)
 - System resource metrics
+
+### Kafka Exporter
+Kafka metrics exposed via kafka-exporter at port 9308:
+- Consumer group lag per topic/partition
+- Broker count and health
+- Topic partition offsets
+
+### Alerting
+Prometheus alerting rules configured for:
+- High error rates (>5% email failures)
+- High latency (p95 > 10s)
+- Queue depth thresholds
+- DLQ accumulation
+- Service availability
+- RTO breach detection
+
+Alert notifications via Alertmanager (port 9093) to:
+- Slack channels
+- Email
+- PagerDuty
+- Custom webhooks
+
+For detailed documentation, see [docs/MONITORING_ALERTING.md](docs/MONITORING_ALERTING.md).
 
 ### Distributed Tracing
 Jaeger provides end-to-end request tracing across services.
