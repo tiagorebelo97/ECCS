@@ -380,6 +380,8 @@ services:
       - POSTGRES_USER=eccs_user
       # Password from environment (required!)
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-eccs_secure_password}
+      # Default database name (used by init script to connect)
+      - POSTGRES_DB=eccs_user
       # Multiple databases to create (handled by init script)
       - POSTGRES_MULTIPLE_DATABASES=eccs_email,eccs_auth
     # Volume mounts for data persistence and initialization
@@ -621,10 +623,11 @@ services:
     # They take precedence over traefik.yml static configuration.
     #
     # SECURITY RATIONALE:
-    #   - Docker provider enables dynamic service discovery from containers
-    #   - exposedbydefault=false ensures only explicitly labeled containers are routed
     #   - File provider loads middlewares (JWT, rate limiting) from config files
     #   - Ping endpoint enables health checks without exposing sensitive data
+    #
+    # NOTE: Docker provider is disabled to avoid permission issues with Podman.
+    # All routing is defined via the file provider in dynamic-config.yml.
     # -------------------------------------------------------------------------
     command:
       # Enable API and dashboard
@@ -632,19 +635,12 @@ services:
       - "--api.dashboard=true"
       - "--api.insecure=true"  # PRODUCTION: Set to false, use proper auth
       # -----------------------------------------------------------------------
-      # Dynamic Service Discovery - Podman/Docker Provider
-      # -----------------------------------------------------------------------
-      # SECURITY: Containers must explicitly enable routing via labels
-      # DYNAMIC DISCOVERY: New containers automatically added to routing table
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=eccs-network"
-      # -----------------------------------------------------------------------
       # Dynamic Configuration - File Provider
       # -----------------------------------------------------------------------
       # Loads middlewares, TLS options, and static service definitions
-      # NOTE: Using filename instead of directory to avoid parsing traefik.yml
-      # which contains Docker-specific template syntax ({{ normalize .Name }})
+      # NOTE: Docker provider is disabled to avoid Podman socket permission issues.
+      # All service routing is defined in dynamic-config.yml instead.
+      - "--providers.docker=false"
       - "--providers.file.filename=/etc/traefik/dynamic/dynamic-config.yml"
       - "--providers.file.watch=true"
       # -----------------------------------------------------------------------
@@ -689,16 +685,11 @@ services:
       - "8080:8080"
     volumes:
       # -----------------------------------------------------------------------
-      # Container Socket - Dynamic Service Discovery
-      # -----------------------------------------------------------------------
-      # PODMAN: Set CONTAINER_SOCK=/run/podman/podman.sock in .env
-      # DOCKER: Set CONTAINER_SOCK=/var/run/docker.sock in .env
-      # SECURITY: Mounted read-only to prevent container manipulation
-      - ${CONTAINER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro
-      # -----------------------------------------------------------------------
       # Dynamic Configuration Files
       # -----------------------------------------------------------------------
       # Contains middlewares (JWT auth, rate limiting), TLS options, routers
+      # NOTE: Docker socket is not mounted since Docker provider is disabled.
+      # All routing is handled via the file provider in dynamic-config.yml.
       - ./infrastructure/traefik:/etc/traefik/dynamic:ro
       # -----------------------------------------------------------------------
       # TLS Certificates

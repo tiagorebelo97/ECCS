@@ -35,9 +35,20 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     CREATE DATABASE eccs_auth;
     
     -- ========================================================================
+    -- GRANT PERMISSIONS
+    -- ========================================================================
+    -- Grant all privileges on the databases to eccs_user
+    -- This ensures the user can connect and perform all operations
+    GRANT ALL PRIVILEGES ON DATABASE eccs_email TO $POSTGRES_USER;
+    GRANT ALL PRIVILEGES ON DATABASE eccs_auth TO $POSTGRES_USER;
+    
+    -- ========================================================================
     -- AUTH DATABASE SCHEMA (eccs_auth)
     -- ========================================================================
     \c eccs_auth
+    
+    -- Grant schema permissions
+    GRANT ALL ON SCHEMA public TO $POSTGRES_USER;
     
     -- Users table for authentication
     -- Stores user credentials and profile information
@@ -52,11 +63,18 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
 
     -- Index for email lookups during login
     CREATE INDEX idx_users_email ON users(email);
+    
+    -- Grant table permissions
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $POSTGRES_USER;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $POSTGRES_USER;
 
     -- ========================================================================
     -- EMAIL DATABASE SCHEMA (eccs_email)
     -- ========================================================================
     \c eccs_email
+    
+    -- Grant schema permissions
+    GRANT ALL ON SCHEMA public TO $POSTGRES_USER;
     
     -- ------------------------------------------------------------------------
     -- Emails Table
@@ -133,6 +151,10 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     CREATE INDEX idx_templates_name ON email_templates(name);
     CREATE INDEX idx_templates_category ON email_templates(category);
     CREATE INDEX idx_templates_user_category ON email_templates(user_id, category);
+    
+    -- Grant table permissions
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $POSTGRES_USER;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $POSTGRES_USER;
     
 EOSQL
 
