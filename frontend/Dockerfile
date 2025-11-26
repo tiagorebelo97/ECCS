@@ -77,7 +77,7 @@ RUN npm run build && \
 # This stage creates the final minimal image using nginx to serve static files.
 # Only the built artifacts are copied, no Node.js or build tools included.
 # -----------------------------------------------------------------------------
-FROM nginx:1.25-alpine AS production
+FROM nginx:1.27-alpine AS production
 
 # LABEL: Production image metadata
 LABEL org.opencontainers.image.title="ECCS Frontend"
