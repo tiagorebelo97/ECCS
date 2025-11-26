@@ -43,9 +43,9 @@ LABEL org.opencontainers.image.vendor="ECCS Team"
 LABEL maintainer="ECCS DevOps Team"
 
 # HEALTHCHECK: Verify Zookeeper is accepting connections
-# Uses the Zookeeper four-letter-word command 'ruok'
+# Uses bash /dev/tcp for health check (nc not available in this image)
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
-    CMD echo "ruok" | nc localhost 2181 | grep -q "imok" || exit 1
+    CMD echo srvr | timeout 2 bash -c 'cat > /dev/tcp/localhost/2181'
 
 # EXPOSE: Document Zookeeper ports
 # 2181: Client connections
