@@ -102,7 +102,11 @@ RUN apk update && \
 # --chown ensures files are owned by nginx user for security
 COPY --from=builder --chown=nginx:nginx /app/build /usr/share/nginx/html
 
-# Copy custom nginx configuration
+# Copy custom main nginx.conf for rootless container compatibility
+# This removes the "user" directive and sets PID file to writable location
+COPY --chown=nginx:nginx nginx-main.conf /etc/nginx/nginx.conf
+
+# Copy custom nginx server configuration
 # This includes security headers and proper routing for SPA
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 
