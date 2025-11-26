@@ -507,6 +507,9 @@ services:
       # Init and sync limits for cluster formation
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
+      # Enable 4-letter-word commands for health checks
+      # Required since ZK 3.5+ for security, whitelist only needed commands
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok,srvr,stat"
     volumes:
       # Persistent storage for Zookeeper data
       - zookeeper_data:/var/lib/zookeeper/data
@@ -514,8 +517,8 @@ services:
     networks:
       - eccs-network
     healthcheck:
-      # Use bash /dev/tcp for health check (nc not available in Confluent image)
-      test: ["CMD-SHELL", "echo srvr | timeout 2 bash -c 'cat > /dev/tcp/localhost/2181'"]
+      # Use ruok 4-letter-word command to verify Zookeeper is healthy
+      test: ["CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181 | grep imok"]
       interval: 10s
       timeout: 5s
       retries: 5
