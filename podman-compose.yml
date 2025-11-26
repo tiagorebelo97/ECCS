@@ -399,16 +399,32 @@ services:
   # Optimized for high write throughput.
   #
   # COLLECTIONS:
-  #   - email_logs: Email processing history
-  #   - application_logs: Centralized application logging
-  #   - audit_events: Security audit trail
+  #   - email_logs: Email processing history with schema validation
+  #   - application_logs: Centralized application logging (capped collection)
+  #   - audit_events: Security audit trail with 365-day retention
+  #   - metrics: Time-series performance data with 30-day retention
   #
   # SECURITY:
   #   - Authentication can be enabled for production
   #   - Internal network only
   #
   # PERSISTENCE:
-  #   - mongodb_data volume for database files
+  #   - mongodb_data: Primary data volume (CRITICAL - contains all log data)
+  #   - mongodb_config: Configuration database volume
+  #
+  # VOLUME MOUNT EXPLANATION:
+  #   /data/db: Primary data directory where MongoDB stores:
+  #     - WiredTiger storage engine files (collection*.wt, index*.wt)
+  #     - Journal files for crash recovery (/data/db/journal/)
+  #     - Database metadata and namespace files
+  #   /data/configdb: Configuration database for replica set metadata
+  #     (required even for standalone, stores local.* collection)
+  #
+  # DATA RETENTION:
+  #   Managed via TTL indexes configured in init scripts:
+  #   - email_logs: 90-day retention (expireAfterSeconds: 7776000)
+  #   - audit_events: 365-day retention (expireAfterSeconds: 31536000)
+  #   - metrics: 30-day retention (expireAfterSeconds: 2592000)
   # --------------------------------------------------------------------------
   mongodb:
     image: mongo:6
@@ -418,9 +434,32 @@ services:
     #   - MONGO_INITDB_ROOT_USERNAME=admin
     #   - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_PASSWORD:-mongodb_password}
     volumes:
-      # Named volume for data persistence
+      # -----------------------------------------------------------------------
+      # Primary Data Volume - CRITICAL for data persistence
+      # -----------------------------------------------------------------------
+      # Mount point: /data/db
+      # Contents: All database files including collections, indexes, and journals
+      # BACKUP: Regular backups recommended using mongodump or filesystem snapshots
+      # RECOVERY: Restore using mongorestore or volume restoration
+      # -----------------------------------------------------------------------
       - mongodb_data:/data/db
-      # Init scripts for collection and index creation
+      # -----------------------------------------------------------------------
+      # Configuration Database Volume
+      # -----------------------------------------------------------------------
+      # Mount point: /data/configdb
+      # Contents: MongoDB configuration database (local.* collections)
+      # Required for: Replica set configuration, oplog, and system metadata
+      # Note: Even standalone instances use this for local database storage
+      # -----------------------------------------------------------------------
+      - mongodb_config:/data/configdb
+      # -----------------------------------------------------------------------
+      # Initialization Scripts (Read-Only)
+      # -----------------------------------------------------------------------
+      # Mount point: /docker-entrypoint-initdb.d
+      # Execution: Scripts run once on first container start (empty data volume)
+      # Order: Alphabetical (01-init-collections.js runs first)
+      # Contents: Collection creation, schema validation, index definitions
+      # -----------------------------------------------------------------------
       - ./database/mongodb/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "27017:27017"
@@ -725,24 +764,44 @@ services:
   # Receives, transforms, and routes logs to Elasticsearch.
   # Central aggregation point for all application logs.
   #
-  # INPUTS:
-  #   - TCP port 5000: JSON logs from applications
-  #   - Beats port 5044: Filebeat agents
+  # PIPELINES:
+  #   1. eccs-main: Real-time log ingestion
+  #      - TCP port 5000: JSON logs from applications
+  #      - Beats port 5044: Filebeat/Metricbeat forwarded logs
+  #      - Output: eccs-logs-YYYY.MM.dd indices
+  #
+  #   2. eccs-mongodb: Backend logs from MongoDB
+  #      - Input: email_logs and application_logs collections
+  #      - Output: eccs-email-logs-YYYY.MM.dd and eccs-app-logs-YYYY.MM.dd
+  #      - Purpose: Enable Kibana dashboards for error rates, latencies, retries
   #
   # PROCESSING:
   #   - JSON parsing
   #   - Timestamp normalization
   #   - GeoIP enrichment
   #   - Service tagging
+  #   - Error categorization (for MongoDB logs)
+  #   - Latency bucket calculation
+  #
+  # KIBANA DASHBOARD QUERIES:
+  #   Error Analysis:
+  #     - status:failed OR status:retry
+  #     - error_category:network OR error_category:auth
+  #   Latency Analysis:
+  #     - latency_bucket:slow OR latency_bucket:critical
+  #     - latencyMs:[5000 TO *]
+  #   Retry Analysis:
+  #     - is_retry:true
+  #     - sentToDlq:true OR tags:dlq
   # --------------------------------------------------------------------------
   logstash:
     image: docker.elastic.co/logstash/logstash:8.11.0
     container_name: eccs-logstash
     volumes:
-      # Pipeline configuration
-      - ./infrastructure/elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
-      # Logstash settings
-      - ./infrastructure/elk/logstash/config:/usr/share/logstash/config:ro
+      # Pipeline configuration (contains main.conf and mongodb-logs.conf)
+      - ./infrastructure/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      # Logstash settings (logstash.yml and pipelines.yml)
+      - ./infrastructure/logstash/config:/usr/share/logstash/config:ro
     ports:
       # Beats input
       - "5044:5044"
@@ -753,8 +812,12 @@ services:
       - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
       # Elasticsearch output URL
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      # MongoDB connection for mongodb-logs pipeline
+      # Used to read email_logs and application_logs collections
+      - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
     depends_on:
       - elasticsearch
+      - mongodb
     networks:
       - eccs-network
     healthcheck:
@@ -769,12 +832,35 @@ services:
   # Kibana - Log Visualization
   # --------------------------------------------------------------------------
   # Web interface for exploring and visualizing Elasticsearch data.
-  # Pre-configured with ECCS dashboards.
+  # Pre-configured with ECCS dashboards for monitoring email processing.
   #
   # FEATURES:
   #   - Log search and filtering
-  #   - Custom dashboards
+  #   - Custom dashboards for error rates, latencies, and retry counts
   #   - Alerting (with X-Pack)
+  #
+  # PRE-CONFIGURED DASHBOARDS:
+  #   [ECCS] Email Processing Dashboard - Comprehensive monitoring including:
+  #   - Error rate visualization (failed vs successful over time)
+  #   - Latency distribution histogram
+  #   - Latency percentiles (p50, p90, p99)
+  #   - Retry count analysis by attempt number
+  #   - Error category breakdown (network, auth, recipient, etc.)
+  #   - Provider performance comparison
+  #   - Dead Letter Queue monitoring
+  #
+  # INDEX PATTERNS:
+  #   - eccs-logs-*: Real-time application logs
+  #   - eccs-email-logs-*: Email processing logs from MongoDB
+  #   - eccs-app-logs-*: Application events from MongoDB
+  #
+  # DASHBOARD IMPORT:
+  #   Saved objects are located in /kibana/saved-objects/ and can be imported:
+  #   1. Via Kibana UI: Stack Management > Saved Objects > Import
+  #   2. Via API: POST /api/saved_objects/_import
+  #   Files:
+  #   - index-patterns.ndjson: Index pattern definitions
+  #   - email-dashboards.ndjson: Visualizations and dashboard
   # --------------------------------------------------------------------------
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
@@ -965,19 +1051,52 @@ networks:
 # BACKUP RECOMMENDATION:
 #   Regularly backup these volumes, especially:
 #   - postgres_data: User and email data
-#   - mongodb_data: Audit logs
+#   - mongodb_data: Audit logs and email processing history
+#   - elasticsearch_data: Searchable log indices
 #
 # PODMAN NOTE:
 #   Volumes are stored in ~/.local/share/containers/storage/volumes/
 #   for rootless Podman.
+#
+# MONGODB VOLUME DETAILS:
+#   mongodb_data: Contains all database files including:
+#     - WiredTiger storage engine files (*.wt files)
+#     - Journal files for durability (/data/db/journal/)
+#     - Collection and index data files
+#   mongodb_config: Contains configuration database for:
+#     - local.* collections (oplog, replica set config)
+#     - System metadata for MongoDB operations
+#
+# VOLUME SIZING GUIDELINES:
+#   - mongodb_data: Allocate based on log retention (90 days default)
+#   - mongodb_config: Minimal storage required (~100MB)
+#   - elasticsearch_data: Allocate based on log volume and retention
 # ============================================================================
 volumes:
   # PostgreSQL database files
   postgres_data:
     name: eccs_postgres_data
-  # MongoDB database files
+  # -------------------------------------------------------------------------
+  # MongoDB Primary Data Volume
+  # -------------------------------------------------------------------------
+  # Contains all database files for the eccs_logs database:
+  # - email_logs collection: Email processing audit trail
+  # - application_logs collection: Capped collection for app events
+  # - audit_events collection: Security audit trail
+  # - metrics collection: Performance metrics data
+  # -------------------------------------------------------------------------
   mongodb_data:
     name: eccs_mongodb_data
+  # -------------------------------------------------------------------------
+  # MongoDB Configuration Database Volume
+  # -------------------------------------------------------------------------
+  # Contains MongoDB's internal configuration database (local.*):
+  # - System.replset: Replica set configuration (if enabled)
+  # - Startup parameters and server metadata
+  # Note: Required even for standalone MongoDB instances
+  # -------------------------------------------------------------------------
+  mongodb_config:
+    name: eccs_mongodb_config
   # Zookeeper data and logs
   zookeeper_data:
     name: eccs_zookeeper_data

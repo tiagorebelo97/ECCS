@@ -3,10 +3,74 @@
 # ============================================================================
 # Defines available pipelines for log processing.
 # Each pipeline can have its own configuration and resources.
+#
+# PIPELINE ARCHITECTURE:
+#   This configuration runs multiple pipelines in parallel:
+#   1. eccs-main: Real-time log ingestion from TCP/Beats inputs
+#   2. eccs-mongodb: Batch processing of MongoDB backend logs
+#
+# RESOURCE ALLOCATION:
+#   - pipeline.workers: Number of filter/output workers per pipeline
+#   - pipeline.batch.size: Events processed per batch (higher = more throughput)
+#   - pipeline.batch.delay: Max wait time (ms) before processing undersized batch
+#
+# ISOLATION BENEFITS:
+#   - Independent scaling of each pipeline
+#   - Failure in one pipeline doesn't affect others
+#   - Different processing characteristics per data source
 # ============================================================================
 
-# Main pipeline for ECCS logs
+# -----------------------------------------------------------------------------
+# Main Pipeline - Real-time Log Ingestion
+# -----------------------------------------------------------------------------
+# Handles real-time log ingestion from:
+#   - TCP port 5000: Direct JSON log streaming from applications
+#   - Beats port 5044: Filebeat/Metricbeat forwarded logs
+#
+# OUTPUT: eccs-logs-YYYY.MM.dd indices in Elasticsearch
+# USE CASE: Real-time monitoring and alerting
+# -----------------------------------------------------------------------------
 - pipeline.id: eccs-main
   path.config: "/usr/share/logstash/pipeline/main.conf"
   pipeline.workers: 2
   pipeline.batch.size: 125
+
+# -----------------------------------------------------------------------------
+# MongoDB Pipeline - Backend Logs to Elasticsearch
+# -----------------------------------------------------------------------------
+# Reads email processing logs from MongoDB and pushes to Elasticsearch
+# for Kibana dashboard visualization.
+#
+# DATA SOURCES:
+#   - email_logs collection: Email delivery audit trail
+#   - application_logs collection: Backend service events
+#
+# OUTPUT INDICES:
+#   - eccs-email-logs-YYYY.MM.dd: Email processing metrics
+#   - eccs-app-logs-YYYY.MM.dd: Application event logs
+#
+# USE CASE: Dashboard visualizations for:
+#   - Error rates and failure analysis
+#   - Latency distribution and percentiles
+#   - Retry counts and DLQ monitoring
+#   - Provider performance comparison
+#
+# KIBANA DASHBOARD QUERIES:
+#   Error Analysis:
+#     - status:failed OR status:retry
+#     - error_category:* (categorized errors)
+#     - is_final_failure:true (DLQ entries)
+#   
+#   Latency Analysis:
+#     - latency_bucket:slow OR latency_bucket:critical
+#     - latencyMs:[5000 TO *] (slow processing)
+#   
+#   Retry Analysis:
+#     - is_retry:true (retried emails)
+#     - attempt:[2 TO *] (multiple attempts)
+#     - tags:dlq (dead letter queue)
+# -----------------------------------------------------------------------------
+- pipeline.id: eccs-mongodb
+  path.config: "/usr/share/logstash/pipeline/mongodb-logs.conf"
+  pipeline.workers: 1
+  pipeline.batch.size: 250

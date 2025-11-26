@@ -1,6 +1,31 @@
 {
-  "_comment": "ECCS Logs Index Template - Applied to all eccs-logs-* indices",
-  "index_patterns": ["eccs-logs-*"],
+  "_comment": "============================================================================",
+  "_comment2": "ECCS Logs Index Template - Applied to all eccs-logs-* and eccs-email-logs-* indices",
+  "_comment3": "============================================================================",
+  "_comment4": "This template defines field mappings for log data indexed from multiple sources:",
+  "_comment5": "  1. Real-time logs from TCP/Beats inputs (eccs-logs-*)",
+  "_comment6": "  2. Email processing logs from MongoDB (eccs-email-logs-*)",
+  "_comment7": "",
+  "_comment8": "INDEX PATTERNS:",
+  "_comment9": "  - eccs-logs-*: General application logs from real-time ingestion",
+  "_comment10": "  - eccs-email-logs-*: Email processing audit trail from MongoDB",
+  "_comment11": "  - eccs-app-logs-*: Application events from MongoDB",
+  "_comment12": "",
+  "_comment13": "QUERY FILTER EXAMPLES:",
+  "_comment14": "  Error Analysis:",
+  "_comment15": "    - status:failed OR status:retry (find all errors)",
+  "_comment16": "    - error_category:network (network-related failures)",
+  "_comment17": "    - is_final_failure:true (dead letter queue entries)",
+  "_comment18": "  Latency Analysis:",
+  "_comment19": "    - latencyMs:[5000 TO *] (slow processing > 5s)",
+  "_comment20": "    - latency_bucket:critical (critical latency alerts)",
+  "_comment21": "    - sendLatencyMs:[3000 TO *] (slow SMTP operations)",
+  "_comment22": "  Retry Analysis:",
+  "_comment23": "    - is_retry:true (retried emails)",
+  "_comment24": "    - attempt:[2 TO *] (multiple delivery attempts)",
+  "_comment25": "    - sentToDlq:true (exhausted retries)",
+  "_comment26": "============================================================================",
+  "index_patterns": ["eccs-logs-*", "eccs-email-logs-*", "eccs-app-logs-*"],
   "priority": 100,
   "template": {
     "settings": {
@@ -41,6 +66,78 @@
           "type": "keyword"
         },
         "emailId": {
+          "type": "keyword"
+        },
+        "mongodb_id": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "errorMessage": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 512
+            }
+          }
+        },
+        "errorCode": {
+          "type": "keyword"
+        },
+        "errorStack": {
+          "type": "text"
+        },
+        "error_category": {
+          "type": "keyword"
+        },
+        "latencyMs": {
+          "type": "long"
+        },
+        "sendLatencyMs": {
+          "type": "long"
+        },
+        "latency_bucket": {
+          "type": "keyword"
+        },
+        "attempt": {
+          "type": "integer"
+        },
+        "maxAttempts": {
+          "type": "integer"
+        },
+        "is_retry": {
+          "type": "boolean"
+        },
+        "is_final_failure": {
+          "type": "boolean"
+        },
+        "sentToDlq": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "keyword"
+        },
+        "email_provider": {
+          "type": "keyword"
+        },
+        "messageId": {
+          "type": "keyword"
+        },
+        "recipientEmail": {
+          "type": "keyword"
+        },
+        "processedAt": {
+          "type": "date"
+        },
+        "retryScheduledAt": {
+          "type": "date"
+        },
+        "backoffDelayMs": {
+          "type": "long"
+        },
+        "pipeline_version": {
           "type": "keyword"
         },
         "container": {
@@ -109,6 +206,13 @@
               "type": "geo_point"
             }
           }
+        },
+        "metadata": {
+          "type": "object",
+          "enabled": true
+        },
+        "tags": {
+          "type": "keyword"
         }
       }
     }
