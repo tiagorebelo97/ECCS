@@ -1,0 +1,475 @@
+/**
+ * ============================================================================
+ * TemplateEditor Styles - ECCS Frontend
+ * ============================================================================
+ * 
+ * RESPONSIVE DESIGN:
+ *   - Mobile-first approach
+ *   - Flexible layout that adapts to screen size
+ *   - Touch-friendly controls
+ * 
+ * ACCESSIBILITY:
+ *   - High contrast for error states
+ *   - Visible focus indicators
+ *   - Reduced motion support
+ * 
+ * ============================================================================
+ */
+
+/* ============================================================================
+   TEMPLATE EDITOR CONTAINER
+   ============================================================================
+*/
+.template-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Desktop: Side-by-side layout for form and preview */
+@media (min-width: 1024px) {
+  .template-editor {
+    flex-direction: row;
+  }
+  
+  .template-editor__form {
+    flex: 2;
+  }
+  
+  .template-preview {
+    flex: 1;
+    position: sticky;
+    top: 1rem;
+    align-self: flex-start;
+  }
+}
+
+/* ============================================================================
+   FORM STYLES
+   ============================================================================
+*/
+.template-editor__form {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 768px) {
+  .template-editor__form {
+    padding: 2rem;
+  }
+}
+
+.template-editor__title {
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+/* Form Group */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.form-label {
+  display: block;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-label__required {
+  color: #c62828;
+}
+
+/* Inputs */
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 44px;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #2196f3;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+}
+
+.form-input:disabled,
+.form-textarea:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.form-input--error,
+.form-textarea.form-input--error {
+  border-color: #c62828;
+}
+
+.form-input--error:focus,
+.form-textarea.form-input--error:focus {
+  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.2);
+}
+
+/* Textarea specific */
+.form-textarea {
+  min-height: 200px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* Help and Error Text */
+.form-help {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.form-error {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #c62828;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   ACTION BUTTONS
+   ============================================================================
+*/
+.template-editor__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #eee;
+}
+
+@media (min-width: 481px) {
+  .template-editor__actions {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.template-editor__actions-left {
+  order: 2;
+}
+
+.template-editor__actions-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  order: 1;
+}
+
+@media (min-width: 481px) {
+  .template-editor__actions-left {
+    order: 1;
+  }
+  
+  .template-editor__actions-right {
+    flex-direction: row;
+    order: 2;
+  }
+}
+
+/* Button Styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, opacity 0.2s;
+  min-height: 44px;
+  min-width: 88px;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.4);
+}
+
+.btn-primary {
+  background-color: #2196f3;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+
+.btn-secondary {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #bdbdbd;
+}
+
+.btn-danger {
+  background-color: #c62828;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #b71c1c;
+}
+
+/* ============================================================================
+   ALERT MESSAGES
+   ============================================================================
+*/
+.alert {
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.alert-success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.alert-error {
+  background-color: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+/* ============================================================================
+   KEYBOARD SHORTCUTS
+   ============================================================================
+*/
+.template-editor__shortcuts {
+  display: none;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+  font-size: 0.75rem;
+  color: #999;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .template-editor__shortcuts {
+    display: flex;
+  }
+}
+
+.template-editor__shortcuts kbd {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+/* ============================================================================
+   VARIABLE PICKER
+   ============================================================================
+*/
+.variable-picker {
+  position: relative;
+}
+
+.variable-picker__toggle {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  min-height: 36px;
+}
+
+.variable-picker__menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  min-width: 250px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0 0;
+}
+
+.variable-picker__option {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.variable-picker__option:hover,
+.variable-picker__option:focus {
+  background-color: #e3f2fd;
+  outline: none;
+}
+
+.variable-picker__name {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: #1976d2;
+}
+
+.variable-picker__desc {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+/* ============================================================================
+   TEMPLATE PREVIEW
+   ============================================================================
+*/
+.template-preview {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.template-preview__title {
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  color: #333;
+}
+
+.template-preview__email {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.template-preview__subject {
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #e0e0e0;
+  color: #333;
+}
+
+.template-preview__body {
+  white-space: pre-wrap;
+  color: #666;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  min-height: 100px;
+}
+
+.template-preview__note {
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: #999;
+  font-style: italic;
+}
+
+/* ============================================================================
+   SPINNER
+   ============================================================================
+*/
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #2196f3;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+.spinner--small {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
+
+/* ============================================================================
+   HIGH CONTRAST MODE
+   ============================================================================
+*/
+@media (prefers-contrast: high) {
+  .form-input:focus,
+  .form-textarea:focus {
+    outline: 3px solid currentColor;
+    box-shadow: none;
+  }
+  
+  .btn:focus {
+    outline: 3px solid currentColor;
+    box-shadow: none;
+  }
+  
+  .form-input--error,
+  .form-textarea.form-input--error {
+    outline: 2px solid currentColor;
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES
+   ============================================================================
+*/
+@media print {
+  .template-editor__actions,
+  .template-editor__shortcuts,
+  .variable-picker {
+    display: none;
+  }
+  
+  .template-editor__form {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+}

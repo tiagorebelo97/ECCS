@@ -1,3 +1,79 @@
+/**
+ * ============================================================================
+ * ECCS Frontend - Global Styles
+ * ============================================================================
+ * 
+ * RESPONSIVE DESIGN APPROACH:
+ * 
+ *   This stylesheet uses a mobile-first approach:
+ *   - Base styles target mobile devices
+ *   - Media queries progressively enhance for larger screens
+ *   - Flexible layouts using CSS Grid and Flexbox
+ * 
+ * ACCESSIBILITY CONSIDERATIONS:
+ * 
+ *   - Color contrast meets WCAG 2.1 AA standards
+ *   - Focus indicators are clearly visible
+ *   - Touch targets meet minimum size requirements (44x44px)
+ *   - Reduced motion is respected
+ *   - Skip links for keyboard navigation
+ * 
+ * CSS CUSTOM PROPERTIES (CSS Variables):
+ * 
+ *   Using custom properties allows for:
+ *   - Easy theming
+ *   - Consistent colors across components
+ *   - Runtime customization
+ * 
+ * ============================================================================
+ */
+
+/* ============================================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================================
+*/
+:root {
+  /* Colors */
+  --color-primary: #2196f3;
+  --color-primary-dark: #1976d2;
+  --color-secondary: #757575;
+  --color-secondary-dark: #616161;
+  --color-success: #2e7d32;
+  --color-success-light: #e8f5e9;
+  --color-error: #c62828;
+  --color-error-light: #ffebee;
+  --color-warning: #ef6c00;
+  --color-warning-light: #fff3e0;
+  
+  /* Typography */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
+  
+  /* Focus ring */
+  --focus-ring: 0 0 0 3px rgba(33, 150, 243, 0.4);
+}
+
+/* ============================================================================
+   RESET AND BASE STYLES
+   ============================================================================
+*/
 * {
   margin: 0;
   padding: 0;
@@ -5,91 +81,216 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f5f5f5;
+  line-height: 1.5;
 }
 
+/* ============================================================================
+   ACCESSIBILITY UTILITIES
+   ============================================================================
+*/
+
+/* Visually hidden but accessible to screen readers */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Skip link - becomes visible on focus */
+.visually-hidden-focusable {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.visually-hidden-focusable:focus {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  height: auto;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-primary);
+  color: white;
+  z-index: 10000;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+/* Focus styles for all interactive elements */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   APP LAYOUT
+   ============================================================================
+*/
 .app {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
+#main-content {
+  flex: 1;
+}
+
+/* ============================================================================
+   NAVBAR
+   ============================================================================
+*/
 .navbar {
-  background-color: #2196f3;
+  background-color: var(--color-primary);
   color: white;
-  padding: 1rem 2rem;
+  padding: var(--spacing-md) var(--spacing-xl);
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  gap: var(--spacing-md);
+  box-shadow: var(--shadow-md);
 }
 
 .navbar h1 {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .navbar h1 {
+    font-size: 1.5rem;
+  }
+}
+
+.navbar nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
 .navbar nav a {
   color: white;
   text-decoration: none;
-  margin-left: 1.5rem;
-  transition: opacity 0.2s;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s, opacity 0.2s;
 }
 
 .navbar nav a:hover {
-  opacity: 0.8;
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
+.navbar nav a:focus {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   CONTAINER
+   ============================================================================
+*/
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: var(--spacing-lg);
 }
 
+@media (min-width: 768px) {
+  .container {
+    padding: var(--spacing-xl);
+  }
+}
+
+/* ============================================================================
+   DASHBOARD
+   ============================================================================
+*/
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
-  margin-top: 1rem;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-md);
 }
 
+@media (min-width: 481px) {
+  .dashboard {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .dashboard {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+}
+
+/* ============================================================================
+   CARDS
+   ============================================================================
+*/
 .card {
   background: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
 }
 
-.card h2 {
+.card h2,
+.card h3 {
   color: #333;
-  margin-bottom: 1rem;
-  font-size: 1.25rem;
+  margin-bottom: var(--spacing-md);
+  font-size: 1.125rem;
 }
 
 .card-stat {
   font-size: 2rem;
   font-weight: bold;
-  color: #2196f3;
+  color: var(--color-primary);
 }
 
+/* ============================================================================
+   FORMS
+   ============================================================================
+*/
 .email-form {
   background: white;
-  border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
   max-width: 600px;
-  margin: 2rem auto;
+  margin: var(--spacing-xl) auto;
+}
+
+@media (min-width: 768px) {
+  .email-form {
+    padding: var(--spacing-xl);
+  }
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--spacing-lg);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--spacing-sm);
   font-weight: 500;
   color: #333;
 }
@@ -99,15 +300,18 @@ body {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 1rem;
-  transition: border-color 0.2s;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 44px; /* Touch target */
 }
 
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
 }
 
 .form-group textarea {
@@ -115,49 +319,81 @@ body {
   resize: vertical;
 }
 
+/* ============================================================================
+   BUTTONS
+   ============================================================================
+*/
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.75rem 1.5rem;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.1s;
+  min-height: 44px; /* Touch target */
+  text-decoration: none;
+}
+
+.btn:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-primary {
-  background-color: #2196f3;
+  background-color: var(--color-primary);
   color: white;
 }
 
-.btn-primary:hover {
-  background-color: #1976d2;
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-dark);
 }
 
 .btn-secondary {
-  background-color: #757575;
+  background-color: var(--color-secondary);
   color: white;
 }
 
-.btn-secondary:hover {
-  background-color: #616161;
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-secondary-dark);
 }
 
+/* ============================================================================
+   EMAIL LIST
+   ============================================================================
+*/
 .email-list {
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
 .email-item {
-  padding: 1rem 1.5rem;
+  padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid #eee;
   cursor: pointer;
   transition: background-color 0.2s;
+  min-height: 66px;
 }
 
-.email-item:hover {
-  background-color: #f9f9f9;
+@media (hover: hover) {
+  .email-item:hover {
+    background-color: #f9f9f9;
+  }
+}
+
+.email-item:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 3px rgba(33, 150, 243, 0.4);
 }
 
 .email-item:last-child {
@@ -172,89 +408,112 @@ body {
 .email-preview {
   color: #666;
   font-size: 0.9rem;
-  margin-top: 0.25rem;
+  margin-top: var(--spacing-xs);
 }
 
 .email-meta {
   color: #999;
   font-size: 0.8rem;
-  margin-top: 0.25rem;
+  margin-top: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
 }
 
+/* ============================================================================
+   STATUS BADGES
+   ============================================================================
+*/
 .status-badge {
   display: inline-block;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .status-sent {
-  background-color: #e8f5e9;
-  color: #2e7d32;
+  background-color: var(--color-success-light);
+  color: var(--color-success);
 }
 
 .status-pending {
-  background-color: #fff3e0;
-  color: #ef6c00;
+  background-color: var(--color-warning-light);
+  color: var(--color-warning);
 }
 
 .status-failed {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: var(--color-error-light);
+  color: var(--color-error);
 }
 
+/* ============================================================================
+   LOGIN PAGE
+   ============================================================================
+*/
 .login-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  padding: var(--spacing-lg);
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .login-form {
   background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 400px;
 }
 
 .login-form h2 {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: var(--spacing-xl);
   color: #333;
 }
 
+/* ============================================================================
+   ALERTS
+   ============================================================================
+*/
 .alert {
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-md);
 }
 
 .alert-success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
+  background-color: var(--color-success-light);
+  color: var(--color-success);
   border: 1px solid #a5d6a7;
 }
 
 .alert-error {
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: var(--color-error-light);
+  color: var(--color-error);
   border: 1px solid #ef9a9a;
 }
 
+/* ============================================================================
+   LOADING STATES
+   ============================================================================
+*/
 .loading {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 2rem;
+  padding: var(--spacing-xl);
+  min-height: 200px;
 }
 
 .spinner {
   border: 3px solid #f3f3f3;
-  border-top: 3px solid #2196f3;
+  border-top: 3px solid var(--color-primary);
   border-radius: 50%;
   width: 30px;
   height: 30px;
@@ -264,4 +523,68 @@ body {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   REDUCED MOTION
+   ============================================================================
+   For users who prefer reduced motion, disable animations.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .spinner {
+    animation-duration: 3s !important;
+  }
+}
+
+/* ============================================================================
+   HIGH CONTRAST MODE
+   ============================================================================
+*/
+@media (prefers-contrast: high) {
+  :focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 3px;
+  }
+  
+  .btn:focus,
+  .form-group input:focus,
+  .form-group textarea:focus {
+    outline: 3px solid currentColor;
+    box-shadow: none;
+  }
+  
+  .status-badge {
+    border: 2px solid currentColor;
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES
+   ============================================================================
+*/
+@media print {
+  .navbar,
+  .btn,
+  .email-filter-bar {
+    display: none !important;
+  }
+  
+  .container {
+    padding: 0;
+    max-width: none;
+  }
+  
+  .card,
+  .email-list {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
 }

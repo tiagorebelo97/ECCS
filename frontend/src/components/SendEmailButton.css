@@ -1,0 +1,438 @@
+/**
+ * ============================================================================
+ * SendEmailButton Styles - ECCS Frontend
+ * ============================================================================
+ * 
+ * DESIGN CONSIDERATIONS:
+ * 
+ *   - Clear visual feedback for all states (idle, loading, success, error)
+ *   - Touch-friendly sizing (min 44x44px)
+ *   - Accessible color contrast
+ *   - Responsive layout
+ *   - Animation with reduced motion support
+ * 
+ * ============================================================================
+ */
+
+/* ============================================================================
+   VISUALLY HIDDEN UTILITY
+   ============================================================================
+*/
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* ============================================================================
+   BUTTON WRAPPER
+   ============================================================================
+*/
+.send-email-button-wrapper {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+/* ============================================================================
+   SEND BUTTON
+   ============================================================================
+*/
+.send-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  min-height: 48px;
+  min-width: 120px;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+}
+
+/* Idle State */
+.send-button--idle {
+  background-color: #2196f3;
+  color: white;
+}
+
+.send-button--idle:hover:not(:disabled) {
+  background-color: #1976d2;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+.send-button--idle:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Loading State */
+.send-button--loading {
+  background-color: #64b5f6;
+  color: white;
+  cursor: wait;
+}
+
+.send-button--loading:disabled {
+  opacity: 1;
+}
+
+/* Success State */
+.send-button--success {
+  background-color: #2196f3;
+  color: white;
+}
+
+/* Error State */
+.send-button--error {
+  background-color: #2196f3;
+  color: white;
+}
+
+/* Disabled State */
+.send-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Focus State */
+.send-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.4);
+}
+
+/* ============================================================================
+   SPINNER
+   ============================================================================
+*/
+.send-button__spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .send-button__spinner {
+    animation-duration: 2s;
+  }
+}
+
+/* ============================================================================
+   RETRY BUTTON
+   ============================================================================
+*/
+.send-button__retry {
+  background-color: #ff9800;
+  color: white;
+  padding: 0.875rem 1.25rem;
+  min-height: 48px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.send-button__retry:hover {
+  background-color: #f57c00;
+}
+
+.send-button__retry:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.4);
+}
+
+/* ============================================================================
+   TOAST NOTIFICATION
+   ============================================================================
+*/
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: toast-slide-in 0.3s ease-out;
+  max-width: calc(100vw - 3rem);
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+/* Success Toast */
+.toast--success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.toast--success .toast__icon {
+  color: #2e7d32;
+}
+
+/* Error Toast */
+.toast--error {
+  background-color: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+
+.toast--error .toast__icon {
+  color: #c62828;
+}
+
+.toast__icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.toast__message {
+  flex: 1;
+  font-size: 0.9375rem;
+}
+
+.toast__dismiss {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem;
+  margin: -0.25rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  color: inherit;
+}
+
+.toast__dismiss:hover {
+  opacity: 1;
+}
+
+.toast__dismiss:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Mobile positioning */
+@media (max-width: 480px) {
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+  }
+}
+
+/* ============================================================================
+   CONFIRMATION DIALOG
+   ============================================================================
+*/
+.confirm-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+  animation: overlay-fade-in 0.2s ease-out;
+  padding: 1rem;
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .confirm-dialog-overlay {
+    animation: none;
+  }
+}
+
+.confirm-dialog {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  animation: dialog-slide-in 0.2s ease-out;
+}
+
+@keyframes dialog-slide-in {
+  from {
+    transform: scale(0.95) translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .confirm-dialog {
+    animation: none;
+  }
+}
+
+.confirm-dialog__title {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.confirm-dialog__content {
+  margin-bottom: 1.5rem;
+}
+
+.confirm-dialog__content p {
+  margin: 0 0 1rem 0;
+  color: #666;
+}
+
+.confirm-dialog__details {
+  background: #f9f9f9;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.confirm-dialog__details div {
+  margin-bottom: 0.25rem;
+}
+
+.confirm-dialog__details div:last-child {
+  margin-bottom: 0;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* ============================================================================
+   BUTTON STYLES (shared)
+   ============================================================================
+*/
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-height: 44px;
+}
+
+.btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.4);
+}
+
+.btn-primary {
+  background-color: #2196f3;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1976d2;
+}
+
+.btn-secondary {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.btn-secondary:hover {
+  background-color: #bdbdbd;
+}
+
+/* ============================================================================
+   HIGH CONTRAST MODE
+   ============================================================================
+*/
+@media (prefers-contrast: high) {
+  .send-button:focus,
+  .send-button__retry:focus {
+    outline: 3px solid currentColor;
+    box-shadow: none;
+  }
+  
+  .toast {
+    border-width: 2px;
+  }
+  
+  .toast__dismiss:focus {
+    outline-width: 3px;
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES
+   ============================================================================
+*/
+@media print {
+  .send-button,
+  .send-button__retry,
+  .toast,
+  .confirm-dialog-overlay {
+    display: none;
+  }
+}
