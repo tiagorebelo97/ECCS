@@ -128,25 +128,55 @@ function renderTemplate(content, data) {
 /**
  * Strips HTML tags to generate plain text version.
  *
+ * This function converts HTML to plain text for email fallback content.
+ * It's used only for generating text alternatives in templates, not for
+ * rendering user-facing content where XSS is a concern.
+ *
+ * NOTE: This function is for email template text generation only.
+ * It preserves some entity sequences for email compatibility.
+ *
  * @param {string} html - HTML content
  * @returns {string} Plain text version
  */
 function htmlToPlainText(html) {
   if (!html) return '';
 
-  return html
-    // Replace <br> and </p> with newlines
+  // Step 1: Replace block-level elements with newlines for structure
+  let text = html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
-    // Remove all HTML tags
-    .replace(/<[^>]+>/g, '')
-    // Decode common HTML entities
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    // Trim extra whitespace
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n');
+
+  // Step 2: Remove all remaining HTML tags
+  // Use a loop to handle nested tags like <script>...</script>
+  let previousText = '';
+  while (previousText !== text) {
+    previousText = text;
+    text = text.replace(/<[^>]*>/g, '');
+  }
+
+  // Step 3: Decode common HTML entities
+  // Using a map to ensure consistent decoding order
+  const entityMap = {
+    '&nbsp;': ' ',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#x27;': "'",
+    '&apos;': "'"
+  };
+
+  for (const [entity, char] of Object.entries(entityMap)) {
+    text = text.split(entity).join(char);
+  }
+
+  // Step 4: Normalize whitespace and trim
+  return text
+    .replace(/\n{3,}/g, '\n\n')  // Max 2 consecutive newlines
+    .replace(/[ \t]+/g, ' ')     // Collapse multiple spaces
     .trim();
 }
 
