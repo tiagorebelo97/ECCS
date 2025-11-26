@@ -173,6 +173,32 @@ ls /backups/
 
 ## Troubleshooting
 
+### Frontend Nginx Errors (Rootless Container)
+
+If you see nginx errors like:
+- `open() "/var/run/nginx.pid" failed (13: Permission denied)`
+- `the "user" directive makes sense only if the master process runs with super-user privileges`
+- `host not found in upstream "traefik"`
+
+**Solution:** Rebuild the frontend container image to apply the latest nginx configuration:
+
+```bash
+# Stop and remove the frontend container
+podman-compose stop frontend
+podman-compose rm frontend
+
+# Rebuild the image without cache
+podman-compose build --no-cache frontend
+
+# Start the frontend again
+podman-compose up -d frontend
+```
+
+**Note:** These errors occur when running an older container image. The current configuration:
+- Removes the `user` directive (not needed for non-root containers)
+- Sets PID file to `/var/run/nginx/nginx.pid` (writable location)
+- Uses dynamic DNS resolution for upstream services
+
 ### Service Won't Start
 
 1. Check logs: `podman-compose logs <service-name>`
