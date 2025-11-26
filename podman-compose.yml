@@ -960,6 +960,8 @@ services:
     volumes:
       # Prometheus configuration
       - ./infrastructure/grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # Alerting rules
+      - ./infrastructure/grafana/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
       # Persistent storage for metrics data
       - prometheus_data:/prometheus
     ports:
@@ -973,6 +975,8 @@ services:
       - '--storage.tsdb.retention.time=15d'
       # Enable lifecycle API for reloading config
       - '--web.enable-lifecycle'
+    depends_on:
+      - kafka-exporter
     networks:
       - eccs-network
     healthcheck:
@@ -1022,6 +1026,102 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:14269/"]
       interval: 10s
       timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Kafka Exporter - Kafka Metrics for Prometheus
+  # --------------------------------------------------------------------------
+  # Exposes Kafka cluster metrics in Prometheus format.
+  # Essential for monitoring consumer lag, topic throughput, and broker health.
+  #
+  # METRICS EXPOSED:
+  #   - kafka_consumergroup_lag: Consumer group lag per partition
+  #   - kafka_topic_partitions: Number of partitions per topic
+  #   - kafka_brokers: Number of brokers in cluster
+  #   - kafka_topic_partition_current_offset: Current offset per partition
+  #   - kafka_consumergroup_current_offset: Consumer group offset
+  #
+  # USAGE:
+  #   Prometheus scrapes this exporter at :9308/metrics
+  #   Grafana visualizes consumer lag and topic throughput
+  # --------------------------------------------------------------------------
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: eccs-kafka-exporter
+    command:
+      # Kafka broker addresses
+      - '--kafka.server=kafka:9092'
+      # Enable consumer group lag metrics
+      - '--log.enable-sarama'
+      # Refresh metadata interval
+      - '--refresh.metadata=30s'
+    depends_on:
+      - kafka
+    networks:
+      - eccs-network
+    ports:
+      - "9308:9308"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9308/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Alertmanager - Alert Notification and Routing
+  # --------------------------------------------------------------------------
+  # Handles alert deduplication, grouping, routing, and notification.
+  # Receives alerts from Prometheus and sends notifications to configured
+  # channels (Slack, email, PagerDuty, etc.).
+  #
+  # FEATURES:
+  #   - Alert grouping: Reduces notification noise
+  #   - Silencing: Temporarily mute alerts during maintenance
+  #   - Inhibition: Suppress alerts when related alert is firing
+  #   - Routing: Send alerts to appropriate teams based on labels
+  #
+  # NOTIFICATION CHANNELS:
+  #   - Slack: Team notifications
+  #   - Email: On-call notifications
+  #   - PagerDuty: Critical incident paging
+  #   - Webhook: Custom integrations
+  #
+  # CONFIGURATION:
+  #   - alertmanager.yml: Routing, receivers, and inhibition rules
+  #   - See infrastructure/grafana/alertmanager.yml for details
+  # --------------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: eccs-alertmanager
+    volumes:
+      # Alertmanager configuration
+      - ./infrastructure/grafana/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      # Persistent storage for silences and notification log
+      - alertmanager_data:/alertmanager
+    command:
+      # Configuration file location
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      # Data storage path
+      - '--storage.path=/alertmanager'
+      # Cluster listen address (for HA setup)
+      - '--cluster.listen-address='
+      # Web external URL
+      - '--web.external-url=http://alertmanager.localhost'
+    ports:
+      - "9093:9093"
+    networks:
+      - eccs-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.localhost`)"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
       retries: 5
     restart: unless-stopped
 
@@ -1114,3 +1214,6 @@ volumes:
   # Prometheus metrics
   prometheus_data:
     name: eccs_prometheus_data
+  # Alertmanager silences and notification log
+  alertmanager_data:
+    name: eccs_alertmanager_data

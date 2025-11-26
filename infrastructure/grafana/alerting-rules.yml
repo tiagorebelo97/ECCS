@@ -1,0 +1,309 @@
+# ============================================================================
+# ECCS Prometheus Alerting Rules
+# ============================================================================
+# This file defines alert rules for monitoring the ECCS email platform.
+# Alerts are evaluated by Prometheus and forwarded to Alertmanager.
+#
+# ALERT SEVERITY LEVELS:
+#   - critical: Immediate attention required, pages on-call
+#   - warning: Attention needed soon, notifies team channel
+#   - info: Informational, logged but no notification
+#
+# RTO (Recovery Time Objective) TARGETS:
+#   - Critical services: 5 minutes
+#   - Warning conditions: 15 minutes
+#   - Email processing: 30 minutes end-to-end
+# ============================================================================
+
+groups:
+  # ==========================================================================
+  # EMAIL PROCESSING ALERTS
+  # ==========================================================================
+  - name: email_processing
+    interval: 30s
+    rules:
+      # ------------------------------------------------------------------------
+      # High Error Rate Alert
+      # ------------------------------------------------------------------------
+      # Triggers when the email failure rate exceeds 5% over 5 minutes.
+      # This indicates systemic issues with email delivery.
+      - alert: HighEmailErrorRate
+        expr: |
+          (
+            sum(rate(emails_processed_total{status="failed"}[5m])) /
+            sum(rate(emails_processed_total[5m]))
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: notification-service
+          category: email
+        annotations:
+          summary: "High email error rate detected"
+          description: "Email failure rate is {{ $value | humanizePercentage }} over the last 5 minutes, exceeding the 5% threshold."
+          runbook_url: "https://wiki.example.com/runbooks/high-email-error-rate"
+          dashboard_url: "http://grafana.localhost/d/eccs-operations/eccs-operations-dashboard"
+
+      # ------------------------------------------------------------------------
+      # Email Processing Latency Alert
+      # ------------------------------------------------------------------------
+      # Triggers when p95 email processing time exceeds 10 seconds.
+      # High latency may indicate SMTP issues or queue backlog.
+      - alert: HighEmailProcessingLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(email_processing_duration_seconds_bucket[5m])) by (le)
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: notification-service
+          category: email
+        annotations:
+          summary: "High email processing latency"
+          description: "Email processing p95 latency is {{ $value | humanizeDuration }}, exceeding the 10s threshold."
+          runbook_url: "https://wiki.example.com/runbooks/high-email-latency"
+
+      # ------------------------------------------------------------------------
+      # Retry Queue Depth Alert
+      # ------------------------------------------------------------------------
+      # Triggers when retry queue has more than 100 messages.
+      # Growing retry queue indicates persistent delivery failures.
+      - alert: HighRetryQueueDepth
+        expr: email_retry_queue_depth > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: notification-service
+          category: queue
+        annotations:
+          summary: "High email retry queue depth"
+          description: "Retry queue has {{ $value }} messages, exceeding threshold of 100."
+          runbook_url: "https://wiki.example.com/runbooks/high-retry-queue"
+
+      # ------------------------------------------------------------------------
+      # Dead Letter Queue Growing Alert
+      # ------------------------------------------------------------------------
+      # Triggers when DLQ messages are accumulating (more than 10/hour).
+      # DLQ growth indicates unrecoverable email failures.
+      - alert: DLQMessagesGrowing
+        expr: |
+          increase(emails_processed_total{status="dlq"}[1h]) > 10
+        for: 5m
+        labels:
+          severity: critical
+          service: notification-service
+          category: dlq
+        annotations:
+          summary: "Dead Letter Queue messages growing"
+          description: "{{ $value }} messages sent to DLQ in the last hour. Manual intervention required."
+          runbook_url: "https://wiki.example.com/runbooks/dlq-investigation"
+
+      # ------------------------------------------------------------------------
+      # No Emails Processed Alert
+      # ------------------------------------------------------------------------
+      # Triggers when no emails have been processed for 10 minutes.
+      # May indicate consumer crash or Kafka connectivity issues.
+      - alert: NoEmailsProcessed
+        expr: |
+          sum(increase(emails_processed_total[10m])) == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: notification-service
+          category: email
+        annotations:
+          summary: "No emails processed"
+          description: "No emails have been processed in the last 10 minutes. Check notification service health."
+          runbook_url: "https://wiki.example.com/runbooks/no-emails-processed"
+
+  # ==========================================================================
+  # API AND SERVICE HEALTH ALERTS
+  # ==========================================================================
+  - name: api_health
+    interval: 30s
+    rules:
+      # ------------------------------------------------------------------------
+      # High API Error Rate Alert
+      # ------------------------------------------------------------------------
+      # Triggers when HTTP 5xx error rate exceeds 1% over 5 minutes.
+      - alert: HighAPIErrorRate
+        expr: |
+          (
+            sum(rate(http_request_duration_seconds_count{status_code=~"5.."}[5m])) /
+            sum(rate(http_request_duration_seconds_count[5m]))
+          ) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          category: api
+        annotations:
+          summary: "High API error rate"
+          description: "API error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+          runbook_url: "https://wiki.example.com/runbooks/high-api-error-rate"
+
+      # ------------------------------------------------------------------------
+      # High API Latency Alert
+      # ------------------------------------------------------------------------
+      # Triggers when API p95 latency exceeds 2 seconds.
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: api
+        annotations:
+          summary: "High API latency on route {{ $labels.route }}"
+          description: "API p95 latency is {{ $value | humanizeDuration }} on route {{ $labels.route }}."
+          runbook_url: "https://wiki.example.com/runbooks/high-api-latency"
+
+      # ------------------------------------------------------------------------
+      # Service Down Alert
+      # ------------------------------------------------------------------------
+      # Triggers when a service's metrics endpoint is unreachable.
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "The {{ $labels.job }} service has been unreachable for more than 1 minute."
+          runbook_url: "https://wiki.example.com/runbooks/service-down"
+
+  # ==========================================================================
+  # KAFKA ALERTS
+  # ==========================================================================
+  - name: kafka
+    interval: 30s
+    rules:
+      # ------------------------------------------------------------------------
+      # Kafka Consumer Lag Alert
+      # ------------------------------------------------------------------------
+      # Triggers when consumer lag exceeds 1000 messages.
+      # High lag indicates consumers can't keep up with producers.
+      - alert: HighKafkaConsumerLag
+        expr: kafka_consumergroup_lag > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+          category: queue
+        annotations:
+          summary: "High Kafka consumer lag"
+          description: "Consumer group {{ $labels.consumergroup }} has {{ $value }} messages lag on topic {{ $labels.topic }}."
+          runbook_url: "https://wiki.example.com/runbooks/kafka-consumer-lag"
+
+      # ------------------------------------------------------------------------
+      # Kafka Under-Replicated Partitions Alert
+      # ------------------------------------------------------------------------
+      # Triggers when there is consumer lag on multiple partitions indicating
+      # potential replication or availability issues.
+      # Note: kafka-exporter doesn't expose JMX metrics, so we use consumer lag
+      # as a proxy for cluster health issues.
+      - alert: KafkaHighPartitionLag
+        expr: |
+          count(kafka_consumergroup_lag > 500) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+          category: replication
+        annotations:
+          summary: "Multiple Kafka partitions with high lag"
+          description: "{{ $value }} partitions have consumer lag > 500 messages. This may indicate cluster issues."
+          runbook_url: "https://wiki.example.com/runbooks/kafka-partition-lag"
+
+      # ------------------------------------------------------------------------
+      # Kafka Broker Offline Alert
+      # ------------------------------------------------------------------------
+      - alert: KafkaBrokerOffline
+        expr: kafka_brokers < 1
+        for: 1m
+        labels:
+          severity: critical
+          service: kafka
+          category: availability
+        annotations:
+          summary: "Kafka broker offline"
+          description: "Kafka broker is offline. Message processing is impacted."
+          runbook_url: "https://wiki.example.com/runbooks/kafka-broker-down"
+
+  # ==========================================================================
+  # RECOVERY TIME OBJECTIVE (RTO) ALERTS
+  # ==========================================================================
+  - name: rto_alerts
+    interval: 1m
+    rules:
+      # ------------------------------------------------------------------------
+      # RTO Breach - Critical Services
+      # ------------------------------------------------------------------------
+      # Triggers when a critical service has been down for more than 5 minutes.
+      # Uses the 'for' duration to track how long the condition has been true.
+      - alert: RTOBreachCritical
+        expr: |
+          up{job=~"email-service|auth-service|notification-service"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          category: rto
+        annotations:
+          summary: "RTO breach for critical service {{ $labels.job }}"
+          description: "Service {{ $labels.job }} has been down for more than 5 minutes, breaching RTO target."
+          runbook_url: "https://wiki.example.com/runbooks/rto-breach"
+
+      # ------------------------------------------------------------------------
+      # Email Processing RTO Alert
+      # ------------------------------------------------------------------------
+      # Triggers when email queue is not being processed for 30 minutes.
+      - alert: EmailProcessingRTOBreach
+        expr: |
+          increase(emails_processed_total[30m]) == 0
+          AND sum(email_retry_queue_depth) > 0
+        for: 5m
+        labels:
+          severity: critical
+          category: rto
+        annotations:
+          summary: "Email processing RTO breach"
+          description: "Emails have not been processed for 30 minutes while queue is not empty. RTO target breached."
+          runbook_url: "https://wiki.example.com/runbooks/email-rto-breach"
+
+  # ==========================================================================
+  # INFRASTRUCTURE ALERTS
+  # ==========================================================================
+  - name: infrastructure
+    interval: 30s
+    rules:
+      # ------------------------------------------------------------------------
+      # High Memory Usage Alert
+      # ------------------------------------------------------------------------
+      - alert: HighMemoryUsage
+        expr: |
+          (process_resident_memory_bytes / 1024 / 1024) > 450
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High memory usage on {{ $labels.job }}"
+          description: "Memory usage is {{ $value | humanize }}MB on {{ $labels.job }}, approaching container limit."
+          runbook_url: "https://wiki.example.com/runbooks/high-memory"
+
+      # ------------------------------------------------------------------------
+      # High Event Loop Lag Alert (Node.js)
+      # ------------------------------------------------------------------------
+      - alert: HighEventLoopLag
+        expr: nodejs_eventloop_lag_seconds > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High Node.js event loop lag on {{ $labels.job }}"
+          description: "Event loop lag is {{ $value | humanizeDuration }} on {{ $labels.job }}."
+          runbook_url: "https://wiki.example.com/runbooks/eventloop-lag"
