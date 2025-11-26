@@ -60,19 +60,20 @@ ping:
 # Each entrypoint listens on a specific port and protocol.
 #
 # PODMAN COMPATIBILITY:
-#   Ports 8000 and 8443 are used instead of 80 and 443 for rootless
+#   Ports 8800 and 8443 are used instead of 80 and 443 for rootless
 #   Podman compatibility. Privileged ports (< 1024) require root access.
+#   Port 8800 is used instead of 8000 to avoid conflicts with commonly used ports.
 #
 # SECURITY ARCHITECTURE:
-#   - web (8000): HTTP traffic, can redirect to HTTPS
+#   - web (8800): HTTP traffic, can redirect to HTTPS
 #   - websecure (8443): HTTPS traffic with TLS termination
 #   - traefik (8080): Internal dashboard and metrics (restrict in production)
 entryPoints:
-  # HTTP entrypoint (port 8000)
+  # HTTP entrypoint (port 8800)
   # ROUTING: Handles unencrypted HTTP traffic
   # SECURITY: In production, redirect all HTTP to HTTPS
   web:
-    address: ":8000"
+    address: ":8800"
     # HTTP to HTTPS redirection (uncomment in production)
     # SECURITY: Forces all traffic through encrypted channel
     # http:
