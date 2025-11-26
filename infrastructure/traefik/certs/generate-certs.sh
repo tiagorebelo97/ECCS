@@ -53,14 +53,16 @@ echo "  Common Name:  ${COMMON_NAME}"
 echo ""
 
 # Generate private key and self-signed certificate
-openssl req -x509 -nodes \
+if ! openssl req -x509 -nodes \
     -days ${DAYS_VALID} \
     -newkey rsa:${KEY_SIZE} \
     -keyout "${KEY_FILE}" \
     -out "${CERT_FILE}" \
     -subj "/C=${COUNTRY}/ST=${STATE}/L=${LOCALITY}/O=${ORGANIZATION}/OU=${ORG_UNIT}/CN=${COMMON_NAME}" \
-    -addext "subjectAltName=${SAN}" \
-    2>/dev/null
+    -addext "subjectAltName=${SAN}"; then
+    echo "ERROR: Failed to generate certificate. Check OpenSSL output above."
+    exit 1
+fi
 
 # Set secure file permissions
 chmod 600 "${KEY_FILE}"

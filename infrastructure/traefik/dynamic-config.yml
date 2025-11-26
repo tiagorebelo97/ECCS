@@ -184,8 +184,13 @@ http:
           - "X-Requested-With"
           - "Accept"
           - "Origin"
+        # CORS Origin Whitelist
+        # SECURITY: Development allows all origins; production MUST restrict to specific domains
+        # Example production config:
+        #   - "https://app.example.com"
+        #   - "https://admin.example.com"
         accessControlAllowOriginList:
-          - "*"  # PRODUCTION: Replace with specific origins
+          - "*"  # PRODUCTION: Replace with specific origins like "https://your-domain.com"
         accessControlMaxAge: 100
         addVaryHeader: true
         # X-Frame-Options: DENY
@@ -459,8 +464,8 @@ tls:
         - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
         - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
         - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
-      # Prefer server cipher suites over client preferences
-      # SECURITY: Ensures strongest available cipher is used
+      # Note: preferServerCipherSuites is deprecated in Go 1.17+
+      # Go automatically prefers server cipher suites for TLS 1.2
 
     # Strict TLS options - maximum security for sensitive endpoints
     strict:

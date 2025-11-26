@@ -5,8 +5,22 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const logger = require('../config/logger');
 
+// JWT Configuration
+// SECURITY: JWT_SECRET is used to sign and verify tokens
+// This secret serves as implicit issuer verification - only tokens signed with this secret are valid
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1h';
+
+// Validate JWT_SECRET configuration at startup
+// SECURITY: Warn if using default secret in non-development environments
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  logger.error('CRITICAL: JWT_SECRET environment variable is not set in production!');
+  logger.error('Set a strong, unique JWT_SECRET for production deployments.');
+}
+
+if (JWT_SECRET.length < 32) {
+  logger.warn('WARNING: JWT_SECRET is less than 32 characters. Consider using a longer secret.');
+}
 
 // Register new user
 router.post('/register', [
