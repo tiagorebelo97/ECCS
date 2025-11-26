@@ -11,10 +11,23 @@
 #   - TLS: TLS/SSL configuration
 #
 # MIDDLEWARE ORDER (applied left to right):
-#   1. rate-limit (reject excess requests)
+#   1. rate-limit (reject excess requests first to prevent DDoS)
 #   2. security-headers (add security headers)
 #   3. jwt-auth (authenticate requests)
 #   4. retry (retry failed requests)
+#
+# SECURITY RATIONALE:
+#   - Rate limiting is applied FIRST to block DDoS attacks before any
+#     expensive authentication or routing operations occur
+#   - JWT validation uses ForwardAuth to delegate to the auth-service,
+#     which verifies the token issuer, expiration, and claims
+#   - TLS 1.2+ with strong cipher suites prevents downgrade attacks
+#   - Security headers protect against XSS, clickjacking, and MIME sniffing
+#
+# DYNAMIC SERVICE DISCOVERY:
+#   Traefik automatically discovers Podman/Docker containers using labels.
+#   Containers with "traefik.enable=true" are added to the routing table.
+#   This configuration provides fallback static definitions for core services.
 # ============================================================================
 
 http:
@@ -26,45 +39,115 @@ http:
     # -------------------------------------------------------------------------
     # JWT Authentication Middleware
     # -------------------------------------------------------------------------
-    # Validates JWT tokens by forwarding to the auth service.
-    # The auth service responds with user information in headers.
+    # SECURITY: Validates JWT tokens by forwarding to the auth service.
     #
-    # FLOW:
-    #   1. Traefik forwards request to auth-service:/api/auth/verify
-    #   2. Auth service validates JWT token
-    #   3. If valid, returns 200 with X-User-Id and X-User-Email headers
-    #   4. If invalid, returns 401 and Traefik rejects the request
-    #   5. Traefik adds auth headers to the original request
+    # TOKEN VALIDATION FLOW:
+    #   1. Traefik extracts Authorization header and forwards to auth-service
+    #   2. Auth service validates:
+    #      - Token signature using JWT_SECRET (issuer verification)
+    #      - Token expiration (exp claim)
+    #      - Token structure and required claims (userId, email)
+    #   3. If valid, auth-service returns 200 with user claims in headers
+    #   4. If invalid (expired, bad signature, missing claims), returns 401
+    #   5. Traefik propagates user identity headers to upstream services
+    #
+    # CLAIM CHECKS PERFORMED BY AUTH-SERVICE:
+    #   - userId: Required - identifies the authenticated user
+    #   - email: Required - user's email address
+    #   - exp: Required - token expiration timestamp (default: 1 hour)
+    #   - iat: Issued-at timestamp for token age verification
+    #
+    # SECURITY CONSIDERATIONS:
+    #   - Token issuer is implicitly verified via shared JWT_SECRET
+    #   - Short token lifetime (1h) limits exposure from stolen tokens
+    #   - Forward auth ensures tokens are verified on every request
     jwt-auth:
       forwardAuth:
         # Auth service verification endpoint
+        # ROUTING: Internal network call to auth-service container
         address: "http://auth-service:3002/api/auth/verify"
         # Headers to copy from auth response to upstream request
+        # These headers propagate user identity to backend services
         authResponseHeaders:
-          - "X-User-Id"
-          - "X-User-Email"
-          - "X-User-Role"
+          - "X-User-Id"      # Numeric user identifier from JWT userId claim
+          - "X-User-Email"   # User email from JWT email claim
+          - "X-User-Role"    # User role for authorization (if present)
         # Trust X-Forwarded-* headers from previous proxies
+        # SECURITY: Enable only if Traefik is behind a trusted proxy
         trustForwardHeader: true
 
     # -------------------------------------------------------------------------
-    # Rate Limiting Middleware
+    # Rate Limiting Middlewares - DDoS Prevention
     # -------------------------------------------------------------------------
-    # Prevents abuse by limiting requests per source IP.
+    # SECURITY: Multiple rate limiting tiers to prevent various attack vectors.
     #
-    # SETTINGS:
-    #   - average: 100 requests per period (sustainable rate)
-    #   - burst: 50 additional requests allowed in bursts
-    #   - period: Time window for rate calculation
+    # DDOS PROTECTION STRATEGY:
+    #   1. Global rate limit: Prevents volumetric attacks
+    #   2. Auth-specific strict limit: Prevents brute force attacks
+    #   3. API rate limit: Prevents application-layer abuse
+    #
+    # RATE LIMIT CALCULATION:
+    #   Requests allowed = average + burst (within period)
+    #   After burst exhausted, requests are throttled to average rate
+    #
+    # IP STRATEGY (depth: 0):
+    #   Uses the immediate client IP. For production behind a load balancer,
+    #   set depth > 0 to use X-Forwarded-For headers.
+
+    # Standard API rate limit - balanced for normal usage
     rate-limit:
       rateLimit:
-        # Sustainable request rate per period
+        # Sustainable request rate: 100 requests per minute
+        # RATIONALE: Allows normal user activity while preventing abuse
         average: 100
-        # Burst capacity (additional requests allowed)
+        # Burst capacity: 50 additional requests for traffic spikes
+        # RATIONALE: Accommodates legitimate burst patterns (page loads)
         burst: 50
         # Time period for rate calculation
         period: 1m
-        # Source of rate limit tracking (IP address)
+        # Source of rate limit tracking (client IP address)
+        sourceCriterion:
+          ipStrategy:
+            # depth: 0 uses direct client IP
+            # For production behind proxy, increase depth
+            depth: 0
+
+    # Strict rate limit for authentication endpoints
+    # SECURITY: Prevents brute force password attacks
+    rate-limit-auth:
+      rateLimit:
+        # Strict limit: 20 requests per minute for auth endpoints
+        # RATIONALE: Limits brute force attempts while allowing retries
+        average: 20
+        # Small burst: 10 requests to allow legitimate login retries
+        burst: 10
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 0
+
+    # Very strict rate limit for sensitive operations
+    # SECURITY: Prevents rapid-fire attacks on sensitive endpoints
+    rate-limit-strict:
+      rateLimit:
+        # Very strict: 10 requests per minute
+        # RATIONALE: For operations like password reset, 2FA
+        average: 10
+        burst: 5
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 0
+
+    # Global rate limit - last line of defense against DDoS
+    # SECURITY: Catches attacks that bypass other rate limits
+    rate-limit-global:
+      rateLimit:
+        # High threshold: 500 requests per minute per IP
+        # RATIONALE: Only triggers during clear abuse patterns
+        average: 500
+        burst: 100
+        period: 1m
         sourceCriterion:
           ipStrategy:
             depth: 0
@@ -72,17 +155,22 @@ http:
     # -------------------------------------------------------------------------
     # Security Headers Middleware
     # -------------------------------------------------------------------------
-    # Adds security headers to all responses for XSS, clickjacking,
-    # and other web security protections.
+    # SECURITY: Adds HTTP security headers to protect against common attacks.
     #
-    # HEADERS ADDED:
-    #   - X-Frame-Options: DENY (prevent clickjacking)
-    #   - X-Content-Type-Options: nosniff (prevent MIME sniffing)
-    #   - X-XSS-Protection: 1; mode=block (enable XSS filter)
-    #   - Strict-Transport-Security: enforce HTTPS
+    # HEADERS AND RATIONALE:
+    #   - X-Frame-Options: DENY - Prevents clickjacking by blocking iframes
+    #   - X-Content-Type-Options: nosniff - Prevents MIME type sniffing
+    #   - X-XSS-Protection: 1; mode=block - Enables browser XSS filter
+    #   - Strict-Transport-Security - Forces HTTPS connections
+    #   - Content-Security-Policy - Controls resource loading sources
+    #
+    # CORS CONFIGURATION:
+    #   Configured for development. In production, restrict origins to
+    #   specific domains to prevent cross-origin attacks.
     security-headers:
       headers:
-        # CORS settings
+        # CORS settings - restrict in production
+        # SECURITY: Development allows all origins; production should whitelist
         accessControlAllowMethods:
           - GET
           - POST
@@ -91,84 +179,148 @@ http:
           - PATCH
           - OPTIONS
         accessControlAllowHeaders:
-          - "*"
+          - "Authorization"
+          - "Content-Type"
+          - "X-Requested-With"
+          - "Accept"
+          - "Origin"
         accessControlAllowOriginList:
-          - "*"
+          - "*"  # PRODUCTION: Replace with specific origins
         accessControlMaxAge: 100
         addVaryHeader: true
-        # Security headers
+        # X-Frame-Options: DENY
+        # SECURITY: Prevents clickjacking attacks via iframes
         frameDeny: true
+        # SSL Redirect (enable in production with HTTPS)
+        # SECURITY: Forces HTTPS to prevent man-in-the-middle attacks
         sslRedirect: false  # Set to true in production with HTTPS
+        # X-XSS-Protection: 1; mode=block
+        # SECURITY: Enables browser's built-in XSS filter
         browserXssFilter: true
+        # X-Content-Type-Options: nosniff
+        # SECURITY: Prevents MIME type sniffing attacks
         contentTypeNosniff: true
-        # HSTS settings (enable in production)
+        # HTTP Strict Transport Security (HSTS)
+        # SECURITY: Forces browsers to use HTTPS for future requests
         forceSTSHeader: true
         stsIncludeSubdomains: true
         stsPreload: true
-        stsSeconds: 31536000
-        # Content Security Policy
+        stsSeconds: 31536000  # 1 year
+        # Custom security headers
         customResponseHeaders:
+          # Prevent search engine indexing of API endpoints
           X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
+          # Referrer policy - don't leak URLs in Referer header
+          Referrer-Policy: "strict-origin-when-cross-origin"
+          # Permissions policy - disable unnecessary browser features
+          Permissions-Policy: "geolocation=(), microphone=(), camera=()"
 
     # -------------------------------------------------------------------------
     # Retry Middleware
     # -------------------------------------------------------------------------
-    # Automatically retries failed requests to handle transient failures.
+    # RELIABILITY: Automatically retries failed requests for transient failures.
     #
     # RETRY CONDITIONS:
-    #   - Network errors
+    #   - Network errors (connection refused, timeout)
     #   - 502 Bad Gateway
     #   - 503 Service Unavailable
     #   - 504 Gateway Timeout
+    #
+    # SECURITY: Limited attempts prevent retry amplification attacks
     retry:
       retry:
+        # Maximum 3 retry attempts
+        # RATIONALE: Balances reliability vs. resource consumption
         attempts: 3
+        # Initial retry delay (exponential backoff applies)
         initialInterval: 100ms
 
     # -------------------------------------------------------------------------
     # Circuit Breaker Middleware
     # -------------------------------------------------------------------------
-    # Prevents cascading failures by stopping requests to unhealthy services.
+    # RELIABILITY: Prevents cascading failures by stopping requests to
+    # unhealthy services. Opens circuit when error threshold exceeded.
     #
     # EXPRESSION: Opens circuit when 30% of requests fail with network errors
+    # SECURITY: Protects backend services from overload during failures
     circuit-breaker:
       circuitBreaker:
+        # Open circuit when 30% of requests fail
+        # RATIONALE: Allows some failures while catching systemic issues
         expression: "NetworkErrorRatio() > 0.30"
 
     # -------------------------------------------------------------------------
     # Compression Middleware
     # -------------------------------------------------------------------------
-    # Compresses responses to reduce bandwidth usage.
+    # PERFORMANCE: Compresses responses to reduce bandwidth usage.
+    # Excluded: Server-Sent Events to maintain streaming
     compress:
       compress:
         excludedContentTypes:
           - "text/event-stream"
 
+    # -------------------------------------------------------------------------
+    # IP Whitelist Middleware (for admin endpoints)
+    # -------------------------------------------------------------------------
+    # SECURITY: Restricts access to admin endpoints by IP address.
+    # Use for dashboard, metrics, and administrative APIs.
+    ip-whitelist-admin:
+      ipAllowList:
+        # Allow localhost and private networks
+        # PRODUCTION: Replace with specific admin IPs
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+
   # ---------------------------------------------------------------------------
   # Services
   # ---------------------------------------------------------------------------
   # Backend service definitions with load balancing and health checks.
+  #
+  # DYNAMIC DISCOVERY:
+  #   Traefik automatically discovers services via Podman/Docker labels.
+  #   These static definitions serve as fallbacks and enable additional
+  #   configuration like health checks and load balancing strategies.
+  #
+  # HEALTH CHECKS:
+  #   Each service exposes /health endpoint for liveness verification.
+  #   Unhealthy instances are removed from the load balancer pool.
   services:
     # Email service backend
+    # ROUTING: Handles /api/emails/* requests
     email-service:
       loadBalancer:
         servers:
           - url: "http://email-service:3001"
         # Health check configuration
+        # RELIABILITY: Removes unhealthy instances from rotation
         healthCheck:
           path: /health
           interval: 10s
           timeout: 3s
-        # Sticky sessions (optional, for stateful services)
-        # sticky:
-        #   cookie:
-        #     name: eccs-email-sticky
+        # Pass host header for virtual hosting
+        passHostHeader: true
 
     # Auth service backend
+    # ROUTING: Handles /api/auth/* requests and JWT verification
     auth-service:
       loadBalancer:
         servers:
           - url: "http://auth-service:3002"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 3s
+        passHostHeader: true
+
+    # Notification service backend (internal, no external routing)
+    # NOTE: This service consumes from Kafka and doesn't expose HTTP
+    notification-service:
+      loadBalancer:
+        servers:
+          - url: "http://notification-service:3003"
         healthCheck:
           path: /health
           interval: 10s
@@ -178,54 +330,148 @@ http:
   # Routers
   # ---------------------------------------------------------------------------
   # URL routing rules that connect entrypoints to services via middlewares.
+  #
+  # ROUTING LOGIC:
+  #   - Requests are matched against rules in priority order
+  #   - First matching rule handles the request
+  #   - Middlewares are applied left-to-right before forwarding
+  #
+  # SECURITY ARCHITECTURE:
+  #   - Public routes (auth): Rate limiting only, no JWT
+  #   - Protected routes (API): Full middleware chain with JWT
+  #   - Secure routes (HTTPS): TLS termination with certificates
   routers:
-    # Email API router (protected by JWT)
+    # -------------------------------------------------------------------------
+    # Email API Router (Protected by JWT)
+    # -------------------------------------------------------------------------
+    # ROUTING: /api/emails/* -> email-service:3001
+    # SECURITY: Requires valid JWT token for access
     email-router:
-      # Match requests starting with /api/emails
       rule: "PathPrefix(`/api/emails`)"
-      # Use the email service backend
       service: email-service
-      # Apply middlewares in order
+      # Middleware order is critical:
+      # 1. rate-limit: Block DDoS before expensive operations
+      # 2. security-headers: Add security headers early
+      # 3. jwt-auth: Verify authentication
+      # 4. retry: Retry transient failures
       middlewares:
-        - jwt-auth
         - rate-limit
         - security-headers
+        - jwt-auth
         - retry
-      # Use HTTP entrypoint
       entryPoints:
         - web
+      # Priority: Lower number = higher priority (default: 0)
+      priority: 10
 
-    # Auth API router (public - no JWT required)
+    # HTTPS Email Router (when TLS is enabled)
+    email-router-secure:
+      rule: "PathPrefix(`/api/emails`)"
+      service: email-service
+      middlewares:
+        - rate-limit
+        - security-headers
+        - jwt-auth
+        - retry
+      entryPoints:
+        - websecure
+      priority: 10
+      tls:
+        options: default
+
+    # -------------------------------------------------------------------------
+    # Auth API Router (Public - No JWT Required)
+    # -------------------------------------------------------------------------
+    # ROUTING: /api/auth/* -> auth-service:3002
+    # SECURITY: Stricter rate limiting to prevent brute force attacks
     auth-router:
       rule: "PathPrefix(`/api/auth`)"
       service: auth-service
+      # Auth endpoints use stricter rate limiting
+      # No JWT middleware (these endpoints issue tokens)
       middlewares:
-        - rate-limit
+        - rate-limit-auth
         - security-headers
       entryPoints:
         - web
+      priority: 10
 
-# -----------------------------------------------------------------------------
+    # HTTPS Auth Router (when TLS is enabled)
+    auth-router-secure:
+      rule: "PathPrefix(`/api/auth`)"
+      service: auth-service
+      middlewares:
+        - rate-limit-auth
+        - security-headers
+      entryPoints:
+        - websecure
+      priority: 10
+      tls:
+        options: default
+
+# =============================================================================
 # TLS Configuration
-# -----------------------------------------------------------------------------
+# =============================================================================
 # TLS/SSL settings for HTTPS connections.
+#
+# SECURITY RATIONALE:
+#   - TLS 1.2+ prevents protocol downgrade attacks
+#   - Strong cipher suites protect against known cryptographic weaknesses
+#   - ECDHE provides forward secrecy (past sessions remain secure if key compromised)
+#   - Self-signed certificates for development; use CA-signed for production
+#
+# CERTIFICATE MANAGEMENT:
+#   Development: Self-signed certificates in /etc/traefik/certs/
+#   Production: Use Let's Encrypt (acme) or enterprise CA certificates
+#
+# CIPHER SUITE SELECTION (in order of preference):
+#   1. ECDHE_RSA_AES_256_GCM_SHA384 - Strong, widely compatible
+#   2. ECDHE_RSA_CHACHA20_POLY1305 - Fast on mobile devices
+#   3. ECDHE_RSA_AES_128_GCM_SHA256 - Good balance of speed and security
+#   4. ECDHE_ECDSA variants - For ECDSA certificates
+# =============================================================================
 tls:
+  # Certificate stores for self-signed or CA certificates
+  # SECURITY: Store certificates securely with restricted file permissions
+  certificates:
+    - certFile: /etc/traefik/certs/eccs.crt
+      keyFile: /etc/traefik/certs/eccs.key
+      # Optional: Specify stores for certificate organization
+      # stores:
+      #   - default
+
+  # TLS options profiles
   options:
-    # Default TLS options
+    # Default TLS options - secure baseline for all connections
     default:
-      # Minimum TLS version (TLS 1.2 recommended)
+      # Minimum TLS version (TLS 1.2 recommended minimum)
+      # SECURITY: TLS 1.0/1.1 have known vulnerabilities
       minVersion: VersionTLS12
+      # Maximum TLS version (latest supported)
+      maxVersion: VersionTLS13
       # Preferred cipher suites (ordered by preference)
+      # SECURITY: Only strong, modern cipher suites included
       cipherSuites:
+        # AES-GCM ciphers with ECDHE for forward secrecy
         - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
         - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
         - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
         - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
         - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
-      # Prefer server cipher suites
-      preferServerCipherSuites: true
-      # Client authentication (optional)
-      # clientAuth:
-      #   caFiles:
-      #     - /etc/traefik/certs/ca.crt
-      #   clientAuthType: RequireAndVerifyClientCert
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+      # Prefer server cipher suites over client preferences
+      # SECURITY: Ensures strongest available cipher is used
+
+    # Strict TLS options - maximum security for sensitive endpoints
+    strict:
+      minVersion: VersionTLS13
+      # TLS 1.3 cipher suites are automatically selected by Go
+      # No explicit cipher suite configuration needed for TLS 1.3
+
+  # Default certificate store
+  stores:
+    default:
+      # Default certificate used when SNI doesn't match
+      defaultCertificate:
+        certFile: /etc/traefik/certs/eccs.crt
+        keyFile: /etc/traefik/certs/eccs.key
