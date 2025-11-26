@@ -166,8 +166,11 @@ providers:
   #   - Configure TLS certificates and options
   #   - Override container-discovered configurations
   file:
-    # Directory containing dynamic configuration files
-    directory: "/etc/traefik/dynamic"
+    # Specific dynamic configuration file to load
+    # NOTE: Using filename instead of directory to avoid parsing the static
+    # traefik.yml file which contains Docker-specific template syntax
+    # (like {{ normalize .Name }}) that the file provider cannot evaluate.
+    filename: "/etc/traefik/dynamic/dynamic-config.yml"
     # Watch for file changes (enables hot-reload)
     # DYNAMIC UPDATES: Configuration changes apply without restart
     watch: true
