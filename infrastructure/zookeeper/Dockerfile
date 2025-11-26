@@ -44,6 +44,7 @@ LABEL maintainer="ECCS DevOps Team"
 
 # HEALTHCHECK: Verify Zookeeper is accepting connections
 # Uses the Zookeeper four-letter-word command 'ruok'
+# Note: Requires KAFKA_OPTS="-Dzookeeper.4lw.commands.whitelist=ruok" to be set
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
     CMD echo "ruok" | nc localhost 2181 | grep -q "imok" || exit 1
 
