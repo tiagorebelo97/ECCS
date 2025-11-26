@@ -201,18 +201,22 @@ groups:
       # ------------------------------------------------------------------------
       # Kafka Under-Replicated Partitions Alert
       # ------------------------------------------------------------------------
-      # Triggers when partitions are under-replicated.
-      - alert: KafkaUnderReplicatedPartitions
-        expr: kafka_server_replicamanager_underreplicatedpartitions > 0
+      # Triggers when there is consumer lag on multiple partitions indicating
+      # potential replication or availability issues.
+      # Note: kafka-exporter doesn't expose JMX metrics, so we use consumer lag
+      # as a proxy for cluster health issues.
+      - alert: KafkaHighPartitionLag
+        expr: |
+          count(kafka_consumergroup_lag > 500) > 3
         for: 5m
         labels:
-          severity: critical
+          severity: warning
           service: kafka
           category: replication
         annotations:
-          summary: "Kafka under-replicated partitions"
-          description: "{{ $value }} partitions are under-replicated. Data loss risk."
-          runbook_url: "https://wiki.example.com/runbooks/kafka-under-replicated"
+          summary: "Multiple Kafka partitions with high lag"
+          description: "{{ $value }} partitions have consumer lag > 500 messages. This may indicate cluster issues."
+          runbook_url: "https://wiki.example.com/runbooks/kafka-partition-lag"
 
       # ------------------------------------------------------------------------
       # Kafka Broker Offline Alert
@@ -238,11 +242,11 @@ groups:
       # ------------------------------------------------------------------------
       # RTO Breach - Critical Services
       # ------------------------------------------------------------------------
-      # Triggers when critical service is down for more than 5 minutes (RTO target).
+      # Triggers when a critical service has been down for more than 5 minutes.
+      # Uses the 'for' duration to track how long the condition has been true.
       - alert: RTOBreachCritical
         expr: |
-          (time() - process_start_time_seconds{job=~"email-service|auth-service|notification-service"}) < 300
-          AND up{job=~"email-service|auth-service|notification-service"} == 0
+          up{job=~"email-service|auth-service|notification-service"} == 0
         for: 5m
         labels:
           severity: critical

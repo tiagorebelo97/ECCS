@@ -976,7 +976,7 @@ services:
       # Enable lifecycle API for reloading config
       - '--web.enable-lifecycle'
     depends_on:
-      - alertmanager
+      - kafka-exporter
     networks:
       - eccs-network
     healthcheck:
