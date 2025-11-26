@@ -16,25 +16,34 @@
 #   3. RTO breach alerts → All channels + Management escalation
 #
 # CONFIGURATION NOTES:
+#   - For production: Uncomment and configure slack_configs, email_configs, etc.
 #   - Replace placeholder URLs with actual webhook URLs
 #   - Set environment variables for sensitive data
 #   - Test all notification channels before production deployment
+#
+# DEVELOPMENT MODE:
+#   By default, this configuration uses a 'null' receiver that accepts all
+#   alerts without sending notifications. This allows Alertmanager to start
+#   successfully without requiring external notification services.
 # ============================================================================
 
 global:
   # ----------------------------------------------------------------------------
   # Global SMTP Configuration (for email notifications)
   # ----------------------------------------------------------------------------
-  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
-  smtp_from: 'alertmanager@eccs.example.com'
-  smtp_auth_username: '${SMTP_USER}'
-  smtp_auth_password: '${SMTP_PASS}'
-  smtp_require_tls: true
+  # NOTE: Uncomment and configure these for production email notifications
+  # smtp_smarthost: 'mailpit:1025'
+  # smtp_from: 'alertmanager@eccs.example.com'
+  # smtp_auth_username: ''
+  # smtp_auth_password: ''
+  # smtp_require_tls: false
 
   # ----------------------------------------------------------------------------
   # Global Slack Configuration
   # ----------------------------------------------------------------------------
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  # NOTE: Set this to your actual Slack webhook URL for production
+  # To create a webhook: https://api.slack.com/messaging/webhooks
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR_WORKSPACE/YOUR_CHANNEL/YOUR_TOKEN'
 
   # ----------------------------------------------------------------------------
   # Global PagerDuty Configuration
@@ -51,8 +60,8 @@ global:
 # TEMPLATES
 # ==============================================================================
 # Custom notification templates for better alert formatting
-templates:
-  - '/etc/alertmanager/templates/*.tmpl'
+# templates:
+#   - '/etc/alertmanager/templates/*.tmpl'
 
 # ==============================================================================
 # ROUTING CONFIGURATION
@@ -60,8 +69,9 @@ templates:
 # Routes define how alerts are matched and sent to receivers.
 # The tree structure allows for hierarchical matching and grouping.
 route:
-  # Default receiver if no other route matches
-  receiver: 'default-slack'
+  # Default receiver - uses 'null' receiver for development (no notifications sent)
+  # For production, change to 'default-slack' and configure slack_api_url above
+  receiver: 'null'
 
   # ----------------------------------------------------------------------------
   # Grouping Configuration
@@ -81,60 +91,61 @@ route:
 
   # ----------------------------------------------------------------------------
   # Child Routes (processed in order, first match wins)
+  # NOTE: Uncomment these routes for production use
   # ----------------------------------------------------------------------------
-  routes:
-    # --------------------------------------------------------------------------
-    # Critical Alerts Route
-    # --------------------------------------------------------------------------
-    # Critical alerts go to multiple channels immediately
-    - match:
-        severity: critical
-      receiver: 'critical-alerts'
-      group_wait: 10s
-      repeat_interval: 1h
-      routes:
-        # RTO breach alerts get escalated to management
-        - match:
-            category: rto
-          receiver: 'rto-escalation'
-          group_wait: 0s
-          repeat_interval: 30m
-
-    # --------------------------------------------------------------------------
-    # Warning Alerts Route
-    # --------------------------------------------------------------------------
-    - match:
-        severity: warning
-      receiver: 'warning-alerts'
-      group_wait: 1m
-      repeat_interval: 4h
-
-    # --------------------------------------------------------------------------
-    # Email Processing Alerts Route
-    # --------------------------------------------------------------------------
-    - match:
-        category: email
-      receiver: 'email-team'
-      group_wait: 30s
-      repeat_interval: 2h
-
-    # --------------------------------------------------------------------------
-    # Kafka/Queue Alerts Route
-    # --------------------------------------------------------------------------
-    - match:
-        category: queue
-      receiver: 'infrastructure-team'
-      group_wait: 1m
-      repeat_interval: 4h
-
-    # --------------------------------------------------------------------------
-    # DLQ Alerts Route (requires manual intervention)
-    # --------------------------------------------------------------------------
-    - match:
-        category: dlq
-      receiver: 'dlq-alerts'
-      group_wait: 10s
-      repeat_interval: 1h
+  # routes:
+  #   # --------------------------------------------------------------------------
+  #   # Critical Alerts Route
+  #   # --------------------------------------------------------------------------
+  #   # Critical alerts go to multiple channels immediately
+  #   - match:
+  #       severity: critical
+  #     receiver: 'critical-alerts'
+  #     group_wait: 10s
+  #     repeat_interval: 1h
+  #     routes:
+  #       # RTO breach alerts get escalated to management
+  #       - match:
+  #           category: rto
+  #         receiver: 'rto-escalation'
+  #         group_wait: 0s
+  #         repeat_interval: 30m
+  #
+  #   # --------------------------------------------------------------------------
+  #   # Warning Alerts Route
+  #   # --------------------------------------------------------------------------
+  #   - match:
+  #       severity: warning
+  #     receiver: 'warning-alerts'
+  #     group_wait: 1m
+  #     repeat_interval: 4h
+  #
+  #   # --------------------------------------------------------------------------
+  #   # Email Processing Alerts Route
+  #   # --------------------------------------------------------------------------
+  #   - match:
+  #       category: email
+  #     receiver: 'email-team'
+  #     group_wait: 30s
+  #     repeat_interval: 2h
+  #
+  #   # --------------------------------------------------------------------------
+  #   # Kafka/Queue Alerts Route
+  #   # --------------------------------------------------------------------------
+  #   - match:
+  #       category: queue
+  #     receiver: 'infrastructure-team'
+  #     group_wait: 1m
+  #     repeat_interval: 4h
+  #
+  #   # --------------------------------------------------------------------------
+  #   # DLQ Alerts Route (requires manual intervention)
+  #   # --------------------------------------------------------------------------
+  #   - match:
+  #       category: dlq
+  #     receiver: 'dlq-alerts'
+  #     group_wait: 10s
+  #     repeat_interval: 1h
 
 # ==============================================================================
 # RECEIVERS
@@ -142,161 +153,176 @@ route:
 # Receivers define notification endpoints and their configurations.
 receivers:
   # ----------------------------------------------------------------------------
+  # Null Receiver (Development/Default)
+  # ----------------------------------------------------------------------------
+  # This receiver accepts all alerts but doesn't send any notifications.
+  # Use this for development or when external notification services are not configured.
+  - name: 'null'
+
+  # ----------------------------------------------------------------------------
   # Default Slack Receiver
   # ----------------------------------------------------------------------------
-  - name: 'default-slack'
-    slack_configs:
-      - channel: '#eccs-alerts'
-        send_resolved: true
-        title: '{{ .Status | toUpper }} {{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }} {{ .CommonLabels.alertname }}'
-        text: >-
-          {{ range .Alerts }}
-          *Alert:* {{ .Annotations.summary }}
-          *Severity:* {{ .Labels.severity }}
-          *Service:* {{ .Labels.service }}
-          *Description:* {{ .Annotations.description }}
-          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
-          {{ end }}
-        actions:
-          - type: button
-            text: 'View Dashboard'
-            url: 'http://grafana.localhost/d/eccs-operations/eccs-operations-dashboard'
-          - type: button
-            text: 'Silence Alert'
-            url: '{{ template "__alertmanagerURL" . }}/#/silences/new?filter=%7Balertname%3D%22{{ .CommonLabels.alertname }}%22%7D'
+  # NOTE: Uncomment and configure slack_api_url in global section first
+  # - name: 'default-slack'
+  #   slack_configs:
+  #     - channel: '#eccs-alerts'
+  #       send_resolved: true
+  #       title: '{{ .Status | toUpper }} {{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }} {{ .CommonLabels.alertname }}'
+  #       text: >-
+  #         {{ range .Alerts }}
+  #         *Alert:* {{ .Annotations.summary }}
+  #         *Severity:* {{ .Labels.severity }}
+  #         *Service:* {{ .Labels.service }}
+  #         *Description:* {{ .Annotations.description }}
+  #         {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+  #         {{ end }}
+  #       actions:
+  #         - type: button
+  #           text: 'View Dashboard'
+  #           url: 'http://grafana.localhost/d/eccs-operations/eccs-operations-dashboard'
+  #         - type: button
+  #           text: 'Silence Alert'
+  #           url: '{{ template "__alertmanagerURL" . }}/#/silences/new?filter=%7Balertname%3D%22{{ .CommonLabels.alertname }}%22%7D'
 
   # ----------------------------------------------------------------------------
   # Critical Alerts Receiver (Multi-channel)
   # ----------------------------------------------------------------------------
-  - name: 'critical-alerts'
-    slack_configs:
-      - channel: '#eccs-critical'
-        send_resolved: true
-        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
-        title: '🚨 CRITICAL: {{ .CommonLabels.alertname }}'
-        text: >-
-          {{ range .Alerts }}
-          *Summary:* {{ .Annotations.summary }}
-          *Service:* {{ .Labels.service }}
-          *Description:* {{ .Annotations.description }}
-          *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
-          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
-          {{ end }}
-    email_configs:
-      - to: 'oncall@example.com'
-        send_resolved: true
-        headers:
-          Subject: '[CRITICAL] ECCS Alert: {{ .CommonLabels.alertname }}'
-    pagerduty_configs:
-      - service_key: '${PAGERDUTY_SERVICE_KEY}'
-        send_resolved: true
-        severity: critical
-        description: '{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}'
-        details:
-          service: '{{ .CommonLabels.service }}'
-          severity: '{{ .CommonLabels.severity }}'
+  # NOTE: For production, uncomment and configure:
+  # - email_configs: Set global smtp_smarthost first
+  # - pagerduty_configs: Add your PagerDuty service key
+  # - name: 'critical-alerts'
+  #   slack_configs:
+  #     - channel: '#eccs-critical'
+  #       send_resolved: true
+  #       color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+  #       title: '🚨 CRITICAL: {{ .CommonLabels.alertname }}'
+  #       text: >-
+  #         {{ range .Alerts }}
+  #         *Summary:* {{ .Annotations.summary }}
+  #         *Service:* {{ .Labels.service }}
+  #         *Description:* {{ .Annotations.description }}
+  #         *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+  #         {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+  #         {{ end }}
+  #   email_configs:
+  #     - to: 'oncall@example.com'
+  #       send_resolved: true
+  #       headers:
+  #         Subject: '[CRITICAL] ECCS Alert: {{ .CommonLabels.alertname }}'
+  #   pagerduty_configs:
+  #     - service_key: 'your-pagerduty-service-key-here'
+  #       send_resolved: true
+  #       severity: critical
+  #       description: '{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+  #       details:
+  #         service: '{{ .CommonLabels.service }}'
+  #         severity: '{{ .CommonLabels.severity }}'
 
   # ----------------------------------------------------------------------------
   # Warning Alerts Receiver
   # ----------------------------------------------------------------------------
-  - name: 'warning-alerts'
-    slack_configs:
-      - channel: '#eccs-alerts'
-        send_resolved: true
-        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
-        title: '⚠️ WARNING: {{ .CommonLabels.alertname }}'
-        text: >-
-          {{ range .Alerts }}
-          *Summary:* {{ .Annotations.summary }}
-          *Service:* {{ .Labels.service }}
-          *Description:* {{ .Annotations.description }}
-          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
-          {{ end }}
+  # - name: 'warning-alerts'
+  #   slack_configs:
+  #     - channel: '#eccs-alerts'
+  #       send_resolved: true
+  #       color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+  #       title: '⚠️ WARNING: {{ .CommonLabels.alertname }}'
+  #       text: >-
+  #         {{ range .Alerts }}
+  #         *Summary:* {{ .Annotations.summary }}
+  #         *Service:* {{ .Labels.service }}
+  #         *Description:* {{ .Annotations.description }}
+  #         {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+  #         {{ end }}
 
   # ----------------------------------------------------------------------------
   # Email Team Receiver
   # ----------------------------------------------------------------------------
-  - name: 'email-team'
-    slack_configs:
-      - channel: '#email-team'
-        send_resolved: true
-        title: '📧 Email Alert: {{ .CommonLabels.alertname }}'
-        text: >-
-          {{ range .Alerts }}
-          *Summary:* {{ .Annotations.summary }}
-          *Description:* {{ .Annotations.description }}
-          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
-          {{ end }}
+  # - name: 'email-team'
+  #   slack_configs:
+  #     - channel: '#email-team'
+  #       send_resolved: true
+  #       title: '📧 Email Alert: {{ .CommonLabels.alertname }}'
+  #       text: >-
+  #         {{ range .Alerts }}
+  #         *Summary:* {{ .Annotations.summary }}
+  #         *Description:* {{ .Annotations.description }}
+  #         {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+  #         {{ end }}
 
   # ----------------------------------------------------------------------------
   # Infrastructure Team Receiver
   # ----------------------------------------------------------------------------
-  - name: 'infrastructure-team'
-    slack_configs:
-      - channel: '#infrastructure'
-        send_resolved: true
-        title: '🏗️ Infrastructure Alert: {{ .CommonLabels.alertname }}'
-        text: >-
-          {{ range .Alerts }}
-          *Summary:* {{ .Annotations.summary }}
-          *Category:* {{ .Labels.category }}
-          *Description:* {{ .Annotations.description }}
-          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
-          {{ end }}
+  # - name: 'infrastructure-team'
+  #   slack_configs:
+  #     - channel: '#infrastructure'
+  #       send_resolved: true
+  #       title: '🏗️ Infrastructure Alert: {{ .CommonLabels.alertname }}'
+  #       text: >-
+  #         {{ range .Alerts }}
+  #         *Summary:* {{ .Annotations.summary }}
+  #         *Category:* {{ .Labels.category }}
+  #         *Description:* {{ .Annotations.description }}
+  #         {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+  #         {{ end }}
 
   # ----------------------------------------------------------------------------
   # DLQ Alerts Receiver
   # ----------------------------------------------------------------------------
-  - name: 'dlq-alerts'
-    slack_configs:
-      - channel: '#eccs-critical'
-        send_resolved: true
-        color: 'danger'
-        title: '☠️ DLQ Alert: Messages Require Manual Review'
-        text: >-
-          {{ range .Alerts }}
-          *Summary:* {{ .Annotations.summary }}
-          *Description:* {{ .Annotations.description }}
-          *Action Required:* Review DLQ messages and reprocess or discard.
-          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
-          {{ end }}
-    email_configs:
-      - to: 'email-ops@example.com'
-        send_resolved: true
-        headers:
-          Subject: '[DLQ] ECCS Dead Letter Queue Alert'
+  # - name: 'dlq-alerts'
+  #   slack_configs:
+  #     - channel: '#eccs-critical'
+  #       send_resolved: true
+  #       color: 'danger'
+  #       title: '☠️ DLQ Alert: Messages Require Manual Review'
+  #       text: >-
+  #         {{ range .Alerts }}
+  #         *Summary:* {{ .Annotations.summary }}
+  #         *Description:* {{ .Annotations.description }}
+  #         *Action Required:* Review DLQ messages and reprocess or discard.
+  #         {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+  #         {{ end }}
+  #   email_configs:
+  #     - to: 'email-ops@example.com'
+  #       send_resolved: true
+  #       headers:
+  #         Subject: '[DLQ] ECCS Dead Letter Queue Alert'
 
   # ----------------------------------------------------------------------------
   # RTO Escalation Receiver
   # ----------------------------------------------------------------------------
-  - name: 'rto-escalation'
-    slack_configs:
-      - channel: '#eccs-critical'
-        send_resolved: true
-        color: 'danger'
-        title: '🔴 RTO BREACH: {{ .CommonLabels.alertname }}'
-        text: >-
-          {{ range .Alerts }}
-          *RECOVERY TIME OBJECTIVE BREACH*
-          *Summary:* {{ .Annotations.summary }}
-          *Service:* {{ .Labels.service }}
-          *Description:* {{ .Annotations.description }}
-          *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
-          {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
-          {{ end }}
-    email_configs:
-      - to: 'oncall@example.com,management@example.com'
-        send_resolved: true
-        headers:
-          Subject: '[RTO BREACH] ECCS Service Recovery Target Exceeded'
-    pagerduty_configs:
-      - service_key: '${PAGERDUTY_SERVICE_KEY}'
-        send_resolved: true
-        severity: critical
-        description: 'RTO BREACH: {{ .CommonLabels.alertname }}'
-    webhook_configs:
-      - url: '${INCIDENT_WEBHOOK_URL}'
-        send_resolved: true
+  # NOTE: For production, uncomment and configure:
+  # - email_configs: Set global smtp_smarthost first
+  # - pagerduty_configs: Add your PagerDuty service key
+  # - webhook_configs: Add your incident webhook URL
+  # - name: 'rto-escalation'
+  #   slack_configs:
+  #     - channel: '#eccs-critical'
+  #       send_resolved: true
+  #       color: 'danger'
+  #       title: '🔴 RTO BREACH: {{ .CommonLabels.alertname }}'
+  #       text: >-
+  #         {{ range .Alerts }}
+  #         *RECOVERY TIME OBJECTIVE BREACH*
+  #         *Summary:* {{ .Annotations.summary }}
+  #         *Service:* {{ .Labels.service }}
+  #         *Description:* {{ .Annotations.description }}
+  #         *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+  #         {{ if .Annotations.runbook_url }}*Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+  #         {{ end }}
+  #   email_configs:
+  #     - to: 'oncall@example.com,management@example.com'
+  #       send_resolved: true
+  #       headers:
+  #         Subject: '[RTO BREACH] ECCS Service Recovery Target Exceeded'
+  #   pagerduty_configs:
+  #     - service_key: 'your-pagerduty-service-key-here'
+  #       send_resolved: true
+  #       severity: critical
+  #       description: 'RTO BREACH: {{ .CommonLabels.alertname }}'
+  #   webhook_configs:
+  #     - url: 'https://your-incident-management-system.example.com/webhook'
+  #       send_resolved: true
 
 # ==============================================================================
 # INHIBITION RULES
