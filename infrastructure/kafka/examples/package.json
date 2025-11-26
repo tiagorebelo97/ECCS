@@ -1,0 +1,26 @@
+{
+  "name": "eccs-kafka-examples",
+  "version": "1.0.0",
+  "description": "Example Kafka producers and consumers for ECCS email system",
+  "main": "producer.js",
+  "scripts": {
+    "producer": "node producer.js",
+    "producer:batch": "node producer.js --batch 10",
+    "consumer": "node consumer.js",
+    "consumer:dlq": "node consumer.js --dlq",
+    "consumer:from-beginning": "node consumer.js --from-beginning"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "uuid": "^9.0.0"
+  },
+  "keywords": [
+    "kafka",
+    "eccs",
+    "email",
+    "example",
+    "producer",
+    "consumer"
+  ],
+  "license": "MIT"
+}

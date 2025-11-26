@@ -89,17 +89,73 @@ echo ""
 # ============================================================================
 
 declare -a TOPICS=(
-    # Primary email notification topic
+    # ========================================================================
+    # PRIMARY EMAIL REQUESTS TOPIC: email_requests
+    # ========================================================================
+    # This is the main topic for email requests from the frontend/email-service.
+    # 
+    # PARTITIONS (6):
+    #   - Allows 6 parallel consumers for horizontal scaling
+    #   - Even partition count for balanced distribution
+    #   - Recommended: partitions >= max expected consumer instances
+    #
+    # REPLICATION FACTOR (1 for dev, 3 for production):
+    #   - Development: 1 (single broker setup)
+    #   - Production: 3 (ensures data durability across broker failures)
+    #   - Note: Cannot exceed number of brokers in the cluster
+    #
+    # RETENTION (7 days = 604800000ms):
+    #   - Keeps messages for replay and debugging
+    #   - Allows consumers to catch up after extended downtime
+    #
+    # CLEANUP POLICY (delete):
+    #   - Time-based retention, oldest messages removed first
+    #   - Suitable for event streaming (vs. compact for state)
+    #
     # Format: topic:partitions:replication:retention_ms:cleanup
-    "email-notifications:3:1:604800000:delete"
+    "email_requests:6:1:604800000:delete"
     
-    # Retry topic for failed email processing
-    # Messages are requeued here for retry attempts
-    "email-notifications-retry:3:1:259200000:delete"
+    # ========================================================================
+    # RETRY TOPIC: email_requests_retry
+    # ========================================================================
+    # Intermediate topic for failed messages awaiting retry with exponential backoff.
+    #
+    # PARTITIONS (6):
+    #   - Matches primary topic for consistent throughput
+    #
+    # REPLICATION FACTOR (1 for dev, 3 for production):
+    #   - Same durability requirements as primary topic
+    #
+    # RETENTION (3 days = 259200000ms):
+    #   - Shorter retention as retries should complete quickly
+    #   - Failed messages move to DLQ after max retries
+    #
+    "email_requests_retry:6:1:259200000:delete"
     
-    # Dead Letter Queue for permanently failed messages
-    # Messages here require manual intervention
-    "email-notifications-dlq:3:1:2592000000:delete"
+    # ========================================================================
+    # DEAD LETTER QUEUE: email_dlq
+    # ========================================================================
+    # Stores messages that failed after all retry attempts for manual investigation.
+    #
+    # PARTITIONS (3):
+    #   - Fewer partitions as DLQ traffic should be minimal
+    #   - Enough for parallel manual processing if needed
+    #
+    # REPLICATION FACTOR (1 for dev, 3 for production):
+    #   - Critical data - failed messages need investigation
+    #   - Higher replication ensures no data loss
+    #
+    # RETENTION (30 days = 2592000000ms):
+    #   - Extended retention for thorough investigation
+    #   - Allows time for debugging and potential reprocessing
+    #
+    # USE CASES:
+    #   - Invalid email addresses (permanent failures)
+    #   - Malformed message payloads
+    #   - Exceeded retry limits
+    #   - Unrecoverable system errors
+    #
+    "email_dlq:3:1:2592000000:delete"
 )
 
 # ============================================================================
@@ -160,7 +216,7 @@ echo -e "${GREEN}Topic Creation Complete!${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
 echo "Created topics:"
-kafka-topics.sh --bootstrap-server $KAFKA_BROKER --list | grep "email-" | while read topic; do
+kafka-topics.sh --bootstrap-server $KAFKA_BROKER --list | grep "email" | while read topic; do
     echo "  - $topic"
 done
 echo ""

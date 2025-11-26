@@ -10,10 +10,10 @@
 #   - Dead letter queue for failed messages
 #   - Retry topic management
 #
-# TOPICS (auto-created or via script):
-#   - email-notifications: Primary email events
-#   - email-notifications-retry: Retry queue
-#   - email-notifications-dlq: Dead letter queue
+# TOPICS (created via create-topics.sh):
+#   - email_requests: Primary email events (6 partitions)
+#   - email_requests_retry: Retry queue (6 partitions)
+#   - email_dlq: Dead letter queue (3 partitions)
 #
 # SECURITY FEATURES:
 #   - Network-restricted access (internal only)

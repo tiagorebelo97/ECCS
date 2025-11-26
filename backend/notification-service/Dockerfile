@@ -13,8 +13,8 @@
 #   - Distributed tracing with Jaeger
 #
 # KAFKA INTEGRATION:
-#   - Consumes from: email-notifications topic
-#   - Produces to: email-notifications-retry, email-notifications-dlq
+#   - Consumes from: email_requests, email_requests_retry topics
+#   - Produces to: email_requests_retry, email_dlq
 #   - Consumer group: notification-group
 #
 # SECURITY FEATURES:

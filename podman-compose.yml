@@ -281,9 +281,9 @@ services:
   # Implements retry logic with exponential backoff.
   #
   # KAFKA TOPICS:
-  #   - email-notifications: Primary consumption
-  #   - email-notifications-retry: Retry queue
-  #   - email-notifications-dlq: Dead letter queue
+  #   - email_requests: Primary consumption
+  #   - email_requests_retry: Retry queue
+  #   - email_dlq: Dead letter queue
   #
   # FEATURES:
   #   - SMTP email delivery
@@ -484,14 +484,14 @@ services:
   # Used for asynchronous communication between services.
   #
   # TOPICS:
-  #   - email-notifications: Primary email event stream
-  #   - email-notifications-retry: Retry queue
-  #   - email-notifications-dlq: Dead letter queue
+  #   - email_requests: Primary email request stream (6 partitions)
+  #   - email_requests_retry: Retry queue for failed messages (6 partitions)
+  #   - email_dlq: Dead letter queue for permanent failures (3 partitions)
   #
   # CONFIGURATION:
   #   - Single broker for development
   #   - Auto-create topics enabled
-  #   - 3 partitions per topic for parallelism
+  #   - Use create-topics.sh for proper topic configuration
   # --------------------------------------------------------------------------
   kafka:
     image: confluentinc/cp-kafka:7.4.0
