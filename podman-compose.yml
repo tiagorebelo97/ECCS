@@ -49,7 +49,7 @@
 #   │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘ │
 #   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
 #   │  │  Prometheus  │  │    Jaeger    │  │   Mailpit    │                  │
-#   │  │  Port 9090   │  │  Port 16686  │  │  Port 1025,  │                  │
+#   │  │  Port 9091   │  │  Port 16686  │  │  Port 1025,  │                  │
 #   │  └──────────────┘  └──────────────┘  │   8025       │                  │
 #   │                                      └──────────────┘                  │
 #   └─────────────────────────────────────────────────────────────────────────┘
@@ -970,7 +970,7 @@ services:
       # Persistent storage for metrics data
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "9091:9090"
     command:
       # Configuration file location
       - '--config.file=/etc/prometheus/prometheus.yml'

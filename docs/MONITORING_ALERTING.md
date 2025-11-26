@@ -44,7 +44,7 @@ This document describes the comprehensive monitoring and alerting setup for the 
 │   │                     Observability Stack                                │  │
 │   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────────┐ │  │
 │   │  │  Prometheus  │──│ Alertmanager │──│         Grafana              │ │  │
-│   │  │    :9090     │  │    :9093     │  │          :3030               │ │  │
+│   │  │    :9091     │  │    :9093     │  │          :3030               │ │  │
 │   │  └──────────────┘  └──────────────┘  └──────────────────────────────┘ │  │
 │   │         │                  │                                           │  │
 │   │         │                  ▼                                           │  │
@@ -374,13 +374,13 @@ docker exec eccs-kafka kafka-consumer-groups --bootstrap-server localhost:9092 -
 curl http://localhost:3003/metrics | grep email_retry_queue_depth
 
 # Check Prometheus targets
-curl http://localhost:9090/api/v1/targets
+curl http://localhost:9091/api/v1/targets
 
 # Check active alerts
 curl http://localhost:9093/api/v2/alerts
 
 # Reload Prometheus configuration
-curl -X POST http://localhost:9090/-/reload
+curl -X POST http://localhost:9091/-/reload
 ```
 
 ---
