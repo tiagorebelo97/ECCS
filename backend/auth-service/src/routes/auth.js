@@ -5,8 +5,22 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const logger = require('../config/logger');
 
+// JWT Configuration
+// SECURITY: JWT_SECRET is used to sign and verify tokens
+// This secret serves as implicit issuer verification - only tokens signed with this secret are valid
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1h';
+
+// Validate JWT_SECRET configuration at startup
+// SECURITY: Warn if using default secret in non-development environments
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  logger.error('CRITICAL: JWT_SECRET environment variable is not set in production!');
+  logger.error('Set a strong, unique JWT_SECRET for production deployments.');
+}
+
+if (JWT_SECRET.length < 32) {
+  logger.warn('WARNING: JWT_SECRET is less than 32 characters. Consider using a longer secret.');
+}
 
 // Register new user
 router.post('/register', [
@@ -97,19 +111,80 @@ router.post('/login', [
 });
 
 // Verify token
+// ============================================================================
+// JWT TOKEN VERIFICATION ENDPOINT
+// ============================================================================
+// This endpoint is called by Traefik's ForwardAuth middleware to validate
+// JWT tokens before forwarding requests to protected services.
+//
+// TOKEN VALIDATION CHECKS:
+//   1. Authorization header presence and format (Bearer <token>)
+//   2. Token signature verification using JWT_SECRET (issuer verification)
+//   3. Token expiration (exp claim)
+//   4. Required claims presence (userId, email)
+//
+// SECURITY FLOW:
+//   Client -> Traefik -> /api/auth/verify -> 200 OK (with headers)
+//                     -> Traefik -> upstream service (with X-User-* headers)
+//
+// RESPONSE HEADERS (forwarded by Traefik to upstream):
+//   - X-User-Id: User's numeric identifier from JWT
+//   - X-User-Email: User's email address from JWT
+//   - X-User-Role: User's role (if present in token)
+// ============================================================================
 router.get('/verify', (req, res) => {
   try {
     const authHeader = req.headers.authorization;
+    
+    // Validate Authorization header format
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ valid: false });
+      logger.warn('Token verification failed: Missing or invalid Authorization header');
+      return res.status(401).json({ valid: false, error: 'Missing or invalid Authorization header' });
     }
 
     const token = authHeader.split(' ')[1];
+    
+    // Verify token signature and expiration
+    // JWT_SECRET serves as issuer verification - only tokens signed with this secret are valid
     const decoded = jwt.verify(token, JWT_SECRET);
     
-    res.json({ valid: true, user: { userId: decoded.userId, email: decoded.email } });
+    // Validate required claims
+    if (!decoded.userId || !decoded.email) {
+      logger.warn('Token verification failed: Missing required claims');
+      return res.status(401).json({ valid: false, error: 'Missing required claims' });
+    }
+    
+    // Set response headers for Traefik ForwardAuth
+    // These headers are forwarded to upstream services for user identification
+    res.set('X-User-Id', String(decoded.userId));
+    res.set('X-User-Email', decoded.email);
+    
+    // Include role if present in token
+    if (decoded.role) {
+      res.set('X-User-Role', decoded.role);
+    }
+    
+    // Return success response
+    res.json({ 
+      valid: true, 
+      user: { 
+        userId: decoded.userId, 
+        email: decoded.email,
+        role: decoded.role || 'user'
+      } 
+    });
   } catch (error) {
-    res.status(401).json({ valid: false });
+    // Handle specific JWT errors for better debugging
+    if (error.name === 'TokenExpiredError') {
+      logger.warn('Token verification failed: Token expired');
+      return res.status(401).json({ valid: false, error: 'Token expired' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      logger.warn('Token verification failed: Invalid token signature');
+      return res.status(401).json({ valid: false, error: 'Invalid token' });
+    }
+    logger.error('Token verification error:', error);
+    res.status(401).json({ valid: false, error: 'Token verification failed' });
   }
 });
 

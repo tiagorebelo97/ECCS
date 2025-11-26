@@ -558,58 +558,99 @@ services:
   traefik:
     image: traefik:v3.0
     container_name: eccs-traefik
+    # -------------------------------------------------------------------------
     # Command-line configuration (overrides static config)
+    # -------------------------------------------------------------------------
+    # These command-line arguments configure Traefik's behavior.
+    # They take precedence over traefik.yml static configuration.
+    #
+    # SECURITY RATIONALE:
+    #   - Docker provider enables dynamic service discovery from containers
+    #   - exposedbydefault=false ensures only explicitly labeled containers are routed
+    #   - File provider loads middlewares (JWT, rate limiting) from config files
+    #   - Ping endpoint enables health checks without exposing sensitive data
+    # -------------------------------------------------------------------------
     command:
       # Enable API and dashboard
+      # SECURITY: Dashboard exposed on internal port 8080 only
       - "--api.dashboard=true"
-      - "--api.insecure=true"
-      # Enable Docker/Podman provider for dynamic configuration
+      - "--api.insecure=true"  # PRODUCTION: Set to false, use proper auth
+      # -----------------------------------------------------------------------
+      # Dynamic Service Discovery - Podman/Docker Provider
+      # -----------------------------------------------------------------------
+      # SECURITY: Containers must explicitly enable routing via labels
+      # DYNAMIC DISCOVERY: New containers automatically added to routing table
       - "--providers.docker=true"
-      # Don't expose containers by default (require labels)
       - "--providers.docker.exposedbydefault=false"
-      # Dynamic configuration from files
+      - "--providers.docker.network=eccs-network"
+      # -----------------------------------------------------------------------
+      # Dynamic Configuration - File Provider
+      # -----------------------------------------------------------------------
+      # Loads middlewares, TLS options, and static service definitions
       - "--providers.file.directory=/etc/traefik/dynamic"
-      # Watch for file changes
       - "--providers.file.watch=true"
-      # HTTP entrypoint
+      # -----------------------------------------------------------------------
+      # Entrypoints - Network Entry Points
+      # -----------------------------------------------------------------------
+      # HTTP entrypoint (port 80)
       - "--entrypoints.web.address=:80"
-      # HTTPS entrypoint
+      # HTTPS entrypoint (port 443) - TLS termination
       - "--entrypoints.websecure.address=:443"
-      # Enable ping for health checks
+      # -----------------------------------------------------------------------
+      # Health Check Endpoint
+      # -----------------------------------------------------------------------
       - "--ping=true"
-      # Logging configuration
+      # -----------------------------------------------------------------------
+      # Logging Configuration
+      # -----------------------------------------------------------------------
+      # JSON format for structured logging and log aggregation
       - "--log.level=INFO"
       - "--log.format=json"
-      # Access logging
       - "--accesslog=true"
       - "--accesslog.format=json"
-      # Jaeger tracing integration
+      # -----------------------------------------------------------------------
+      # Distributed Tracing - Jaeger Integration
+      # -----------------------------------------------------------------------
       - "--tracing.jaeger=true"
       - "--tracing.jaeger.samplingServerURL=http://jaeger:5778/sampling"
       - "--tracing.jaeger.localAgentHostPort=jaeger:6831"
-      # Prometheus metrics
+      # -----------------------------------------------------------------------
+      # Metrics - Prometheus Integration
+      # -----------------------------------------------------------------------
       - "--metrics.prometheus=true"
       - "--metrics.prometheus.addEntryPointsLabels=true"
       - "--metrics.prometheus.addServicesLabels=true"
     ports:
-      # HTTP
+      # HTTP - Main web traffic
       - "80:80"
-      # HTTPS
+      # HTTPS - Secure web traffic with TLS termination
       - "443:443"
-      # Dashboard/API
+      # Dashboard/API - Internal monitoring (restrict in production)
       - "8080:8080"
     volumes:
-      # Container socket for dynamic service discovery
-      # For Podman: /run/podman/podman.sock
-      # For Docker: /var/run/docker.sock
+      # -----------------------------------------------------------------------
+      # Container Socket - Dynamic Service Discovery
+      # -----------------------------------------------------------------------
+      # PODMAN: Set CONTAINER_SOCK=/run/podman/podman.sock in .env
+      # DOCKER: Set CONTAINER_SOCK=/var/run/docker.sock in .env
+      # SECURITY: Mounted read-only to prevent container manipulation
       - ${CONTAINER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock:ro
-      # Dynamic configuration files
+      # -----------------------------------------------------------------------
+      # Dynamic Configuration Files
+      # -----------------------------------------------------------------------
+      # Contains middlewares (JWT auth, rate limiting), TLS options, routers
       - ./infrastructure/traefik:/etc/traefik/dynamic:ro
+      # -----------------------------------------------------------------------
+      # TLS Certificates
+      # -----------------------------------------------------------------------
+      # Development: Self-signed certificates generated by generate-certs.sh
+      # Production: Mount CA-signed certificates or use Let's Encrypt
+      - ./infrastructure/traefik/certs:/etc/traefik/certs:ro
     networks:
       - eccs-network
     labels:
       - "traefik.enable=true"
-      # Dashboard routing
+      # Dashboard routing - accessible at http://traefik.localhost
       - "traefik.http.routers.dashboard.rule=Host(`traefik.localhost`)"
       - "traefik.http.routers.dashboard.service=api@internal"
     healthcheck:

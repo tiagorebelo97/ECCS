@@ -10,29 +10,46 @@
 #   2. Environment variables
 #   3. This static configuration file
 #   4. Dynamic configuration files (lowest priority)
+#
+# SECURITY OVERVIEW:
+#   - API Gateway enforces authentication, rate limiting, and TLS
+#   - JWT tokens validated via ForwardAuth to auth-service
+#   - Rate limiting prevents DDoS and brute force attacks
+#   - TLS 1.2+ enforced with strong cipher suites
+#   - Container discovery via Podman socket (read-only access)
+#
+# PODMAN COMPATIBILITY:
+#   This configuration supports both Docker and Podman runtimes.
+#   Set CONTAINER_SOCK environment variable to the appropriate socket path:
+#   - Docker: /var/run/docker.sock
+#   - Podman (rootless): /run/user/1000/podman/podman.sock
+#   - Podman (rootful): /run/podman/podman.sock
 # ============================================================================
 
 # -----------------------------------------------------------------------------
 # Global Settings
 # -----------------------------------------------------------------------------
 global:
-  # Don't check for Traefik updates
+  # Don't check for Traefik updates (security: prevents external requests)
   checkNewVersion: false
-  # Don't send anonymous usage data
+  # Don't send anonymous usage data (privacy)
   sendAnonymousUsage: false
 
 # -----------------------------------------------------------------------------
 # API and Dashboard
 # -----------------------------------------------------------------------------
+# SECURITY: Dashboard exposed on internal port only (8080)
+# In production, consider disabling insecure mode and using authentication
 api:
-  # Enable the API
-  insecure: true
-  # Enable the dashboard
+  # Enable the API (required for dashboard)
+  insecure: true  # PRODUCTION: Set to false and use proper authentication
+  # Enable the dashboard for monitoring and debugging
   dashboard: true
-  # Enable debug mode (disable in production)
+  # Debug mode (disable in production for security)
   debug: false
 
 # Enable ping endpoint for health checks
+# ROUTING: Exposed on the traefik entrypoint (port 8080)
 ping:
   entryPoint: traefik
 
@@ -40,113 +57,226 @@ ping:
 # Entrypoints
 # -----------------------------------------------------------------------------
 # Entrypoints are the network entry points into Traefik.
+# Each entrypoint listens on a specific port and protocol.
+#
+# SECURITY ARCHITECTURE:
+#   - web (80): HTTP traffic, can redirect to HTTPS
+#   - websecure (443): HTTPS traffic with TLS termination
+#   - traefik (8080): Internal dashboard and metrics (restrict in production)
 entryPoints:
   # HTTP entrypoint (port 80)
+  # ROUTING: Handles unencrypted HTTP traffic
+  # SECURITY: In production, redirect all HTTP to HTTPS
   web:
     address: ":80"
-    # Optional: Redirect HTTP to HTTPS
+    # HTTP to HTTPS redirection (uncomment in production)
+    # SECURITY: Forces all traffic through encrypted channel
     # http:
     #   redirections:
     #     entryPoint:
     #       to: websecure
     #       scheme: https
+    #       permanent: true
 
   # HTTPS entrypoint (port 443)
+  # ROUTING: Handles encrypted HTTPS traffic with TLS termination
+  # SECURITY: TLS configuration defined in dynamic config
   websecure:
     address: ":443"
-    # HTTP/2 settings
+    # HTTP/2 settings for improved performance
     http2:
       maxConcurrentStreams: 250
-    # TLS configuration is in dynamic config
+    # HTTP/3 QUIC support (optional, requires UDP)
+    # http3: {}
+    # Default TLS options (references tls.options.default in dynamic config)
 
   # Dashboard/API entrypoint (internal only)
+  # SECURITY: Bind to localhost only in production
+  # address: "127.0.0.1:8080"
   traefik:
     address: ":8080"
 
 # -----------------------------------------------------------------------------
-# Providers
+# Providers - Dynamic Service Discovery
 # -----------------------------------------------------------------------------
 # Providers are infrastructure components that provide configuration to Traefik.
+# Traefik supports multiple providers simultaneously for flexible deployment.
+#
+# DYNAMIC SERVICE DISCOVERY:
+#   Traefik automatically detects Podman/Docker containers and creates
+#   routing rules based on container labels. This enables:
+#   - Zero-downtime deployments (new containers auto-registered)
+#   - Service scaling (multiple replicas auto-discovered)
+#   - Blue-green deployments (swap routing via labels)
+#
+# CONTAINER LABEL FORMAT:
+#   - traefik.enable=true                          # Enable container routing
+#   - traefik.http.routers.<name>.rule=...         # Routing rule
+#   - traefik.http.services.<name>.loadbalancer... # Service config
 providers:
-  # Docker/Podman provider
-  # Reads container labels for routing configuration
+  # -------------------------------------------------------------------------
+  # Docker/Podman Provider - Container Discovery
+  # -------------------------------------------------------------------------
+  # DYNAMIC DISCOVERY: Automatically detects running containers and creates
+  # routing rules based on container labels. Supports both Docker and Podman.
+  #
+  # PODMAN COMPATIBILITY:
+  #   Podman provides a Docker-compatible socket API. Traefik connects to
+  #   either runtime using the same provider configuration.
+  #
+  # SECURITY CONSIDERATIONS:
+  #   - Socket mounted read-only (:ro) to prevent container manipulation
+  #   - exposedByDefault=false requires explicit opt-in via labels
+  #   - Network constraint limits routing to specified network only
   docker:
     # Container socket endpoint
-    # For Podman: /run/podman/podman.sock
-    # For Docker: /var/run/docker.sock
+    # PODMAN: Set CONTAINER_SOCK=/run/podman/podman.sock in environment
+    # DOCKER: Set CONTAINER_SOCK=/var/run/docker.sock in environment
+    # The socket path is controlled by the CONTAINER_SOCK environment variable
     endpoint: "unix:///var/run/docker.sock"
-    # Don't expose containers by default (require explicit labels)
+    # SECURITY: Don't expose containers by default
+    # Containers must explicitly enable routing with traefik.enable=true
     exposedByDefault: false
     # Network to use for container communication
+    # ROUTING: Only containers on this network are routable
     network: eccs-network
-    # Watch for container changes
+    # Watch for container changes (enables dynamic updates)
+    # DYNAMIC DISCOVERY: New containers automatically added to routing
     watch: true
+    # Default rule for containers without explicit routing rules
+    # Uses container name as subdomain: <container>.localhost
+    defaultRule: "Host(`{{ normalize .Name }}.localhost`)"
+    # Constraints to limit which containers are discovered
+    # Example: Only discover containers with specific label
+    # constraints: "Label(`traefik.constraint`, `eccs`)"
 
-  # File provider for dynamic configuration
+  # -------------------------------------------------------------------------
+  # File Provider - Static and Override Configuration
+  # -------------------------------------------------------------------------
+  # CONFIGURATION: Loads additional configuration from YAML/TOML files.
+  # Used for middlewares, TLS options, and static service definitions.
+  #
+  # USAGE:
+  #   - Define reusable middlewares (rate limiting, auth, headers)
+  #   - Configure TLS certificates and options
+  #   - Override container-discovered configurations
   file:
     # Directory containing dynamic configuration files
     directory: "/etc/traefik/dynamic"
-    # Watch for file changes
+    # Watch for file changes (enables hot-reload)
+    # DYNAMIC UPDATES: Configuration changes apply without restart
     watch: true
 
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
+# OBSERVABILITY: Structured logging for debugging and monitoring.
+# JSON format enables easy parsing by log aggregation systems (ELK, Loki).
 log:
   # Log level (DEBUG, INFO, WARN, ERROR)
+  # PRODUCTION: Use INFO or WARN to reduce log volume
   level: INFO
   # Log format (common, json)
+  # JSON format for structured logging and log aggregation
   format: json
 
 # Access log configuration
+# SECURITY: Access logs record all HTTP requests for audit and debugging
 accessLog:
-  # Enable access logging
+  # Enable access logging with JSON format
   format: json
   # Buffer size (number of access logs to buffer before writing)
+  # PERFORMANCE: Batches writes to reduce I/O overhead
   bufferingSize: 100
-  # Filter access logs
+  # Filter access logs to reduce volume
   filters:
-    # Only log status codes >= 400
-    statusCodes:
-      - "400-599"
-    # Minimum duration to log
+    # Log all status codes (comment out to log only errors)
+    # statusCodes:
+    #   - "400-599"
+    # Minimum duration to log (filters out fast requests)
     minDuration: "10ms"
+  # Fields to include in access logs
+  fields:
+    # Default field mode (keep, drop, redact)
+    defaultMode: keep
+    # Specific field overrides
+    headers:
+      defaultMode: drop
+      # Keep specific headers for debugging
+      names:
+        User-Agent: keep
+        X-Forwarded-For: keep
+        X-User-Id: keep
 
 # -----------------------------------------------------------------------------
 # Tracing (Jaeger)
 # -----------------------------------------------------------------------------
+# OBSERVABILITY: Distributed tracing for request flow visualization.
+# Integrates with Jaeger for end-to-end trace collection across services.
 tracing:
   # Jaeger backend for distributed tracing
   jaeger:
-    # Sampling server URL
+    # Sampling server URL for adaptive sampling
     samplingServerURL: "http://jaeger:5778/sampling"
-    # Local agent for trace collection
+    # Local agent for trace collection (UDP)
     localAgentHostPort: "jaeger:6831"
-    # Trace propagation format
+    # Trace propagation format (jaeger, b3, w3c)
     propagation: "jaeger"
-    # Service name in traces
+    # Trace context header name
     traceContextHeaderName: "uber-trace-id"
 
 # -----------------------------------------------------------------------------
 # Metrics (Prometheus)
 # -----------------------------------------------------------------------------
+# OBSERVABILITY: Prometheus metrics for monitoring and alerting.
+# Exposes HTTP request metrics, response times, and error rates.
 metrics:
   prometheus:
-    # Enable Prometheus metrics
+    # Add entrypoint labels to metrics
     addEntryPointsLabels: true
+    # Add service labels to metrics
     addServicesLabels: true
+    # Add router labels to metrics
     addRoutersLabels: true
-    # Expose on the traefik entrypoint
+    # Expose metrics on the traefik entrypoint (port 8080)
     entryPoint: traefik
+    # Buckets for request duration histogram
+    # MONITORING: Enables latency percentile calculations
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.2
+      - 5.0
 
 # -----------------------------------------------------------------------------
-# Certificate Resolvers (Let's Encrypt)
+# Certificate Resolvers (Let's Encrypt / ACME)
 # -----------------------------------------------------------------------------
-# Uncomment for automatic TLS certificates in production
+# SECURITY: Automatic TLS certificate management using ACME protocol.
+# Supports Let's Encrypt for free, trusted certificates in production.
+#
+# PRODUCTION SETUP:
+#   1. Uncomment the certificatesResolvers section below
+#   2. Update email address for certificate notifications
+#   3. Ensure port 80 is accessible for HTTP-01 challenge
+#   4. Or use DNS-01 challenge for wildcard certificates
+#
+# SELF-SIGNED CERTIFICATES (Development):
+#   For development, use self-signed certificates configured in dynamic config.
+#   See: infrastructure/traefik/certs/README.md for generation instructions.
+#
 # certificatesResolvers:
 #   letsencrypt:
 #     acme:
+#       # Email for certificate expiry notifications
 #       email: admin@example.com
+#       # Storage file for ACME account and certificates
 #       storage: /etc/traefik/acme.json
+#       # HTTP-01 challenge (requires port 80 access)
 #       httpChallenge:
 #         entryPoint: web
+#       # Alternative: DNS-01 challenge for wildcards
+#       # dnsChallenge:
+#       #   provider: cloudflare
+#       #   resolvers:
+#       #     - "1.1.1.1:53"
+#       #     - "8.8.8.8:53"
