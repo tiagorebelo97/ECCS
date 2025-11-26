@@ -2,6 +2,21 @@
 
 This directory contains TLS certificates for the Traefik API gateway.
 
+## Automatic Certificate Generation
+
+When using the start script (`scripts/start.sh`), self-signed certificates are automatically generated if they don't exist. You don't need to generate them manually for development.
+
+```bash
+# Start the platform (certificates are auto-generated)
+./scripts/start.sh
+```
+
+Or run the generation script manually:
+
+```bash
+./generate-certs.sh
+```
+
 ## Security Overview
 
 TLS (Transport Layer Security) encryption protects data in transit between clients and the API gateway:

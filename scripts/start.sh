@@ -166,6 +166,25 @@ check_prerequisites() {
         export CONTAINER_SOCK="/var/run/docker.sock"
     fi
     
+    # Generate TLS certificates if they don't exist (required for Traefik)
+    CERT_DIR="$PROJECT_ROOT/infrastructure/traefik/certs"
+    if [ ! -f "$CERT_DIR/eccs.crt" ] || [ ! -f "$CERT_DIR/eccs.key" ]; then
+        log_info "TLS certificates not found. Generating self-signed certificates..."
+        if [ -f "$CERT_DIR/generate-certs.sh" ]; then
+            (cd "$CERT_DIR" && bash generate-certs.sh)
+        else
+            # Inline certificate generation as fallback
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout "$CERT_DIR/eccs.key" \
+                -out "$CERT_DIR/eccs.crt" \
+                -subj "/C=US/ST=State/L=City/O=ECCS/OU=Development/CN=localhost" \
+                -addext "subjectAltName=DNS:localhost,DNS:*.localhost,DNS:api.localhost,DNS:traefik.localhost,IP:127.0.0.1" 2>/dev/null
+            chmod 600 "$CERT_DIR/eccs.key"
+            chmod 644 "$CERT_DIR/eccs.crt"
+        fi
+        log_success "TLS certificates generated"
+    fi
+    
     log_success "Prerequisites check passed"
 }
 
