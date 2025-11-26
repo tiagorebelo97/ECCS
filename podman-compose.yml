@@ -47,18 +47,20 @@
 #   │  │Elasticsearch │  │   Logstash   │  │    Kibana    │  │   Grafana   │ │
 #   │  │  Port 9200   │  │  Port 5044   │  │  Port 5601   │  │  Port 3030  │ │
 #   │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘ │
-#   │  ┌──────────────┐  ┌──────────────┐                                     │
-#   │  │  Prometheus  │  │    Jaeger    │                                     │
-#   │  │  Port 9090   │  │  Port 16686  │                                     │
-#   │  └──────────────┘  └──────────────┘                                     │
+#   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
+#   │  │  Prometheus  │  │    Jaeger    │  │   Mailpit    │                  │
+#   │  │  Port 9090   │  │  Port 16686  │  │  Port 1025,  │                  │
+#   │  └──────────────┘  └──────────────┘  │   8025       │                  │
+#   │                                      └──────────────┘                  │
 #   └─────────────────────────────────────────────────────────────────────────┘
 #
 # STARTUP ORDER:
 #   1. Infrastructure: zookeeper, kafka, postgres, mongodb, elasticsearch
-#   2. Observability: logstash, kibana, prometheus, grafana, jaeger
-#   3. Backend: auth-service, email-service, notification-service
-#   4. Frontend: frontend
-#   5. Gateway: traefik (routes traffic to all services)
+#   2. Development: mailpit (SMTP server for testing - optional in production)
+#   3. Observability: logstash, kibana, prometheus, grafana, jaeger
+#   4. Backend: auth-service, email-service, notification-service
+#   5. Frontend: frontend
+#   6. Gateway: traefik (routes traffic to all services)
 #
 # SECURITY FEATURES:
 #   - All services run as non-root users where supported
@@ -314,10 +316,12 @@ services:
       # MongoDB for logging
       - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
       # SMTP configuration for email delivery
-      - SMTP_HOST=${SMTP_HOST:-smtp.example.com}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER:-user@example.com}
-      - SMTP_PASS=${SMTP_PASS:-password}
+      # Default: Use Mailpit container for development (no auth required)
+      # Override in .env for production SMTP server
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
       # Retry configuration
       - RETRY_ATTEMPTS=3
       - RETRY_DELAY=5000
@@ -326,6 +330,7 @@ services:
     depends_on:
       - kafka
       - mongodb
+      - mailpit
     networks:
       - eccs-network
     # No Traefik routing - internal service only
@@ -1120,6 +1125,63 @@ services:
       - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Mailpit - Development SMTP Server
+  # --------------------------------------------------------------------------
+  # Mailpit is a lightweight email testing tool for development environments.
+  # It captures all outgoing emails without actually sending them, making it
+  # perfect for testing email functionality in development.
+  #
+  # FEATURES:
+  #   - SMTP server that captures all emails
+  #   - Web UI for viewing captured emails
+  #   - API for automated testing
+  #   - No external dependencies
+  #   - Supports attachments and HTML emails
+  #
+  # PORTS:
+  #   - 1025: SMTP server (for sending emails)
+  #   - 8025: Web UI (for viewing captured emails)
+  #
+  # USAGE:
+  #   Configure your application to use:
+  #     SMTP_HOST=mailpit
+  #     SMTP_PORT=1025
+  #     SMTP_USER= (leave empty, no auth required)
+  #     SMTP_PASS= (leave empty, no auth required)
+  #
+  # WEB UI:
+  #   Access at http://localhost:8025 to view all captured emails
+  #
+  # NOTE:
+  #   This is for development/testing only. Do not use in production!
+  # --------------------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: eccs-mailpit
+    ports:
+      # SMTP server port
+      - "1025:1025"
+      # Web UI port
+      - "8025:8025"
+    environment:
+      # Maximum number of messages to store (0 = unlimited)
+      - MP_MAX_MESSAGES=500
+      # Enable verbose logging for debugging
+      - MP_VERBOSE=true
+    networks:
+      - eccs-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailpit.rule=Host(`mailpit.localhost`)"
+      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8025/"]
       interval: 30s
       timeout: 10s
       retries: 5

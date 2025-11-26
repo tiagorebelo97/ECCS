@@ -30,8 +30,8 @@ A fully containerized microservices email system built with modern cloud-native 
 │                     ┌────────────────┴────────────────┐                    │
 │                     ▼                                 ▼                    │
 │              ┌─────────────┐                  ┌──────────────┐             │
-│              │  MongoDB    │                  │    SMTP      │             │
-│              │  (Logging)  │                  │   Server     │             │
+│              │  MongoDB    │                  │   Mailpit    │             │
+│              │  (Logging)  │                  │ (Dev SMTP)   │             │
 │              └─────────────┘                  └──────────────┘             │
 │                                                                             │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
@@ -112,6 +112,7 @@ docker-compose -f podman-compose.yml up -d
 |---------|-----|
 | Frontend | http://localhost:3000 |
 | Traefik Dashboard | http://localhost:8080 |
+| Mailpit (Email Testing) | http://localhost:8025 |
 | Grafana | http://localhost:3030 |
 | Kibana | http://localhost:5601 |
 | Jaeger | http://localhost:16686 |
@@ -175,6 +176,7 @@ Kafka consumer that processes emails with retry logic.
 - 3 retry attempts with exponential backoff
 - Dead Letter Queue for failed messages
 - SMTP integration for email delivery
+- **Mailpit** - Development SMTP server included (view emails at http://localhost:8025)
 
 ## 📊 Monitoring
 
