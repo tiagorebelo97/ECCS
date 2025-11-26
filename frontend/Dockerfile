@@ -96,10 +96,10 @@ RUN apk update && \
     # to ensure our custom rootless-compatible configs take effect
     rm -f /etc/nginx/nginx.conf && \
     rm -f /etc/nginx/conf.d/default.conf && \
-    # Create directory for nginx to store temp files (needed for non-root)
-    mkdir -p /var/cache/nginx /var/run/nginx && \
+    # Create cache directory for nginx temp files (needed for non-root operation)
+    mkdir -p /var/cache/nginx && \
     # Ensure nginx user owns required directories for rootless operation
-    chown -R nginx:nginx /var/cache/nginx /var/run/nginx /var/log/nginx
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx
 
 # Copy built React application from builder stage
 # --chown ensures files are owned by nginx user for security
