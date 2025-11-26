@@ -63,12 +63,14 @@ podman-compose logs -f email-service
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:3000 |
-| API Gateway | http://localhost:80 |
+| API Gateway | http://localhost:8000 |
 | Traefik Dashboard | http://localhost:8080 |
 | Grafana | http://localhost:3030 |
 | Kibana | http://localhost:5601 |
 | Jaeger | http://localhost:16686 |
 | Prometheus | http://localhost:9090 |
+
+**Note:** The API Gateway uses port 8000 (instead of 80) for rootless Podman compatibility. Privileged ports (< 1024) require root access.
 
 ## Kubernetes Deployment
 
