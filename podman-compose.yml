@@ -49,17 +49,18 @@
 #   │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘ │
 #   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
 #   │  │  Prometheus  │  │    Jaeger    │  │   Mailpit    │                  │
-#   │  │  Port 9090   │  │  Port 16686  │  │  Ports 1025  │                  │
+#   │  │  Port 9090   │  │  Port 16686  │  │  Port 1025,  │                  │
 #   │  └──────────────┘  └──────────────┘  │   8025       │                  │
 #   │                                      └──────────────┘                  │
 #   └─────────────────────────────────────────────────────────────────────────┘
 #
 # STARTUP ORDER:
-#   1. Infrastructure: zookeeper, kafka, postgres, mongodb, elasticsearch, mailpit
-#   2. Observability: logstash, kibana, prometheus, grafana, jaeger
-#   3. Backend: auth-service, email-service, notification-service
-#   4. Frontend: frontend
-#   5. Gateway: traefik (routes traffic to all services)
+#   1. Infrastructure: zookeeper, kafka, postgres, mongodb, elasticsearch
+#   2. Development: mailpit (SMTP server for testing - optional in production)
+#   3. Observability: logstash, kibana, prometheus, grafana, jaeger
+#   4. Backend: auth-service, email-service, notification-service
+#   5. Frontend: frontend
+#   6. Gateway: traefik (routes traffic to all services)
 #
 # SECURITY FEATURES:
 #   - All services run as non-root users where supported
