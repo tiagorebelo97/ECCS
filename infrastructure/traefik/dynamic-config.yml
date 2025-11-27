@@ -295,14 +295,15 @@ http:
     # ROUTING: Handles /api/emails/* requests
     email-service:
       loadBalancer:
-        servers:
-          - url: "http://email-service:3001"
         # Health check configuration
         # RELIABILITY: Removes unhealthy instances from rotation
         healthCheck:
           path: /health
-          interval: 10s
-          timeout: 3s
+          scheme: http
+          interval: "10s"
+          timeout: "3s"
+        servers:
+          - url: "http://email-service:3001"
         # Pass host header for virtual hosting
         passHostHeader: true
 
@@ -310,12 +311,13 @@ http:
     # ROUTING: Handles /api/auth/* requests and JWT verification
     auth-service:
       loadBalancer:
-        servers:
-          - url: "http://auth-service:3002"
         healthCheck:
           path: /health
-          interval: 10s
-          timeout: 3s
+          scheme: http
+          interval: "10s"
+          timeout: "3s"
+        servers:
+          - url: "http://auth-service:3002"
         passHostHeader: true
 
     # Frontend service
@@ -387,7 +389,7 @@ http:
     # ROUTING: /api/emails/* -> email-service:3001
     # SECURITY: Requires valid JWT token for access
     email-router:
-      rule: "PathPrefix(`/api/emails`)"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/emails`)"
       service: email-service
       # Middleware order is critical:
       # 1. rate-limit: Block DDoS before expensive operations
@@ -406,7 +408,7 @@ http:
 
     # HTTPS Email Router (when TLS is enabled)
     email-router-secure:
-      rule: "PathPrefix(`/api/emails`)"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/emails`)"
       service: email-service
       middlewares:
         - rate-limit
@@ -425,7 +427,7 @@ http:
     # ROUTING: /api/auth/* -> auth-service:3002
     # SECURITY: Stricter rate limiting to prevent brute force attacks
     auth-router:
-      rule: "PathPrefix(`/api/auth`)"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/auth`)"
       service: auth-service
       # Auth endpoints use stricter rate limiting
       # No JWT middleware (these endpoints issue tokens)
@@ -438,7 +440,7 @@ http:
 
     # HTTPS Auth Router (when TLS is enabled)
     auth-router-secure:
-      rule: "PathPrefix(`/api/auth`)"
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/auth`)"
       service: auth-service
       middlewares:
         - rate-limit-auth
