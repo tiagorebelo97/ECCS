@@ -109,7 +109,7 @@ const retryQueueDepth = new promClient.Gauge({
  * Returns service status for liveness/readiness probes.
  */
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', service: 'notification-service' });
+  res.status(200).json({ status: 'healthy', service: 'notification-service' });
 });
 
 /**

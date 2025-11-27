@@ -299,7 +299,6 @@ http:
         # RELIABILITY: Removes unhealthy instances from rotation
         healthCheck:
           path: /health
-          scheme: http
           interval: "10s"
           timeout: "3s"
         servers:
@@ -313,7 +312,6 @@ http:
       loadBalancer:
         healthCheck:
           path: /health
-          scheme: http
           interval: "10s"
           timeout: "3s"
         servers:
