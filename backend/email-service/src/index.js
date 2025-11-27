@@ -156,7 +156,7 @@ app.use((req, res, next) => {
  * Returns service status for liveness/readiness probes.
  */
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', service: 'email-service' });
+  res.status(200).json({ status: 'healthy', service: 'email-service' });
 });
 
 /**
