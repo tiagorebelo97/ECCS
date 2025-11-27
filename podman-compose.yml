@@ -177,6 +177,9 @@ services:
       context: ./backend/email-service
       dockerfile: Dockerfile
     container_name: eccs-email-service
+    # Port mapping: host:container for direct access
+    ports:
+      - "3001:3001"
     # Environment variables for service configuration
     environment:
       # Runtime environment
@@ -255,6 +258,9 @@ services:
       context: ./backend/auth-service
       dockerfile: Dockerfile
     container_name: eccs-auth-service
+    # Port mapping: host:container for direct access
+    ports:
+      - "3002:3002"
     environment:
       - NODE_ENV=production
       # PostgreSQL connection for user data
