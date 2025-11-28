@@ -48,15 +48,15 @@
 #   │  │  Port 9200   │  │  Port 5044   │  │  Port 5601   │  │  Port 3030  │ │
 #   │  └──────────────┘  └──────────────┘  └──────────────┘  └─────────────┘ │
 #   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
-#   │  │  Prometheus  │  │    Jaeger    │  │   Mailpit    │                  │
-#   │  │  Port 9091   │  │  Port 16686  │  │  Port 1025,  │                  │
-#   │  └──────────────┘  └──────────────┘  │   8025       │                  │
+#   │  │  Prometheus  │  │    Jaeger    │  │   Postfix    │                  │
+#   │  │  Port 9091   │  │  Port 16686  │  │  Port 25,    │                  │
+#   │  └──────────────┘  └──────────────┘  │   587        │                  │
 #   │                                      └──────────────┘                  │
 #   └─────────────────────────────────────────────────────────────────────────┘
 #
 # STARTUP ORDER:
 #   1. Infrastructure: zookeeper, kafka, postgres, mongodb, elasticsearch
-#   2. Development: mailpit (SMTP server for testing - optional in production)
+#   2. Email: postfix (SMTP server for email delivery)
 #   3. Observability: logstash, kibana, prometheus, grafana, jaeger
 #   4. Backend: auth-service, email-service, notification-service
 #   5. Frontend: frontend
@@ -346,10 +346,10 @@ services:
       - POSTGRES_USER=eccs_user
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-eccs_secure_password}
       # SMTP configuration for email delivery
-      # Default: Use Mailpit container for development (no auth required)
-      # Override in .env for production SMTP server
-      - SMTP_HOST=${SMTP_HOST:-mailpit}
-      - SMTP_PORT=${SMTP_PORT:-1025}
+      # Default: Use Postfix container for production email delivery
+      # Override in .env for external SMTP server
+      - SMTP_HOST=${SMTP_HOST:-postfix}
+      - SMTP_PORT=${SMTP_PORT:-25}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       # Retry configuration
@@ -362,7 +362,7 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
-      mailpit:
+      postfix:
         condition: service_healthy
       postgres:
         condition: service_healthy
@@ -721,8 +721,8 @@ services:
     environment:
       # Bypass proxy for internal container service names
       # This ensures health checks and ForwardAuth requests go directly to containers
-      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,mailpit,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
-      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,mailpit,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     ports:
       # HTTP - Main web traffic (port 8800 to avoid conflicts with commonly used port 8000)
       - "8800:8800"
@@ -1208,63 +1208,70 @@ services:
     restart: unless-stopped
 
   # --------------------------------------------------------------------------
-  # Mailpit - Development SMTP Server
+  # Postfix - Production SMTP Server
   # --------------------------------------------------------------------------
-  # Mailpit is a lightweight email testing tool for development environments.
-  # It captures all outgoing emails without actually sending them, making it
-  # perfect for testing email functionality in development.
+  # Postfix is a production-ready Mail Transfer Agent (MTA) that actually
+  # delivers emails to their recipients. Unlike development tools, Postfix
+  # sends real emails to the configured recipients.
   #
   # FEATURES:
-  #   - SMTP server that captures all emails
-  #   - Web UI for viewing captured emails
-  #   - API for automated testing
-  #   - No external dependencies
-  #   - Supports attachments and HTML emails
+  #   - Full-featured SMTP server for email delivery
+  #   - Supports TLS encryption for secure email transmission
+  #   - Configurable relay host for external SMTP services
+  #   - Queue management for reliable delivery
+  #   - Detailed logging for monitoring and debugging
   #
   # PORTS:
-  #   - 1025: SMTP server (for sending emails)
-  #   - 8025: Web UI (for viewing captured emails)
+  #   - 25: Standard SMTP port (internal use only)
+  #   - 587: Submission port for authenticated email sending
   #
   # USAGE:
   #   Configure your application to use:
-  #     SMTP_HOST=mailpit
-  #     SMTP_PORT=1025
-  #     SMTP_USER= (leave empty, no auth required)
-  #     SMTP_PASS= (leave empty, no auth required)
+  #     SMTP_HOST=postfix
+  #     SMTP_PORT=25
+  #     SMTP_USER= (leave empty for local relay)
+  #     SMTP_PASS= (leave empty for local relay)
   #
-  # WEB UI:
-  #   Access at http://localhost:8025 to view all captured emails
+  # RELAY CONFIGURATION:
+  #   For production, configure SMTP_RELAY_HOST to use an external SMTP
+  #   service (e.g., Gmail, SendGrid, AWS SES) for better deliverability.
   #
   # NOTE:
-  #   This is for development/testing only. Do not use in production!
+  #   Ensure proper DNS configuration (SPF, DKIM, DMARC) for production
+  #   to avoid emails being marked as spam.
   # --------------------------------------------------------------------------
-  mailpit:
-    image: axllent/mailpit:latest
-    container_name: eccs-mailpit
+  postfix:
+    image: boky/postfix:latest
+    container_name: eccs-postfix
     ports:
-      # SMTP server port
-      - "1025:1025"
-      # Web UI port
-      - "8025:8025"
+      # Standard SMTP port (internal use)
+      - "25:25"
+      # Submission port for authenticated sending
+      - "587:587"
     environment:
-      # Maximum number of messages to store (0 = unlimited)
-      - MP_MAX_MESSAGES=500
-      # Enable verbose logging for debugging
-      - MP_VERBOSE=true
+      # Allow relay from the internal Docker network
+      # Note: Use a proper domain in production (not .local which is reserved for mDNS)
+      - ALLOWED_SENDER_DOMAINS=${ALLOWED_SENDER_DOMAINS:-eccs.internal}
+      # Hostname for the mail server
+      - HOSTNAME=${SMTP_HOSTNAME:-mail.eccs.internal}
+      # Optional: External SMTP relay for better deliverability
+      # Uncomment and configure for production use
+      - RELAYHOST=${SMTP_RELAY_HOST:-}
+      - RELAYHOST_USERNAME=${SMTP_RELAY_USER:-}
+      - RELAYHOST_PASSWORD=${SMTP_RELAY_PASS:-}
+    volumes:
+      # Persistent mail queue storage
+      - postfix_spool:/var/spool/postfix
     networks:
       - eccs-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.mailpit.rule=Host(`mailpit.localhost`)"
-      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
     healthcheck:
-      # Mailpit provides a built-in readyz command for healthchecks
-      # This is the recommended way to check Mailpit health since the image is scratch-based
-      test: ["CMD", "/mailpit", "readyz"]
+      # Check if Postfix SMTP port is accessible
+      # Using nc (netcat) for reliable network-based health check
+      test: ["CMD-SHELL", "nc -z localhost 25 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 15s
+      start_period: 30s
     restart: unless-stopped
 
 # ============================================================================
@@ -1359,3 +1366,6 @@ volumes:
   # Alertmanager silences and notification log
   alertmanager_data:
     name: eccs_alertmanager_data
+  # Postfix mail queue storage
+  postfix_spool:
+    name: eccs_postfix_spool
