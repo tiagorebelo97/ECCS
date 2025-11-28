@@ -141,8 +141,9 @@ create_index_template() {
     TEMPLATE_FILE="$SCRIPT_DIR/../infrastructure/elasticsearch/templates/eccs-logs-template.json"
     
     if [ -f "$TEMPLATE_FILE" ]; then
-        # Remove comments from the template (JSON doesn't support comments)
-        local template_content=$(grep -v '"_comment' "$TEMPLATE_FILE")
+        # Remove JSON comment fields (lines containing "_comment") using sed
+        # This is more robust than simple grep as it preserves JSON structure
+        local template_content=$(sed '/"_comment/d' "$TEMPLATE_FILE" | tr -d '\n')
         
         curl -s -X PUT "$ELASTICSEARCH_HOST/_index_template/eccs-logs-template" \
             -H "Content-Type: application/json" \

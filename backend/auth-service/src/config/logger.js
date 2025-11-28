@@ -93,7 +93,7 @@ if (process.env.NODE_ENV === 'production') {
    */
   if (process.env.LOGSTASH_HOST || process.env.NODE_ENV === 'production') {
     logger.add(new winston.transports.Logstash({
-      port: parseInt(process.env.LOGSTASH_PORT) || 5000,
+      port: parseInt(process.env.LOGSTASH_PORT, 10) || 5000,
       host: process.env.LOGSTASH_HOST || 'logstash',
       node_name: 'auth-service',
       max_connect_retries: -1,
