@@ -101,6 +101,16 @@ const retryQueueDepth = new promClient.Gauge({
   help: 'Current number of emails in retry queue'
 });
 
+/**
+ * Counter metric for tracking PostgreSQL status update failures.
+ * Used to monitor data synchronization issues between MongoDB and PostgreSQL.
+ */
+const postgresUpdateFailures = new promClient.Counter({
+  name: 'postgres_email_status_update_failures_total',
+  help: 'Total number of failed PostgreSQL email status updates',
+  labelNames: ['status']
+});
+
 // ============================================================================
 // HEALTH CHECK AND METRICS ENDPOINTS
 // ============================================================================
@@ -156,12 +166,22 @@ async function updateEmailStatus(emailId, status, errorMessage = null) {
           updated_at = NOW()
       WHERE id = $3
     `;
-    await pool.query(query, [status, errorMessage, emailId]);
-    logger.info({
-      message: 'Email status updated in PostgreSQL',
-      emailId: emailId,
-      status: status
-    });
+    const result = await pool.query(query, [status, errorMessage, emailId]);
+
+    if (result.rowCount === 0) {
+      logger.warn({
+        message: 'Email status update affected no rows - email may not exist',
+        emailId: emailId,
+        status: status
+      });
+      postgresUpdateFailures.inc({ status: status });
+    } else {
+      logger.info({
+        message: 'Email status updated in PostgreSQL',
+        emailId: emailId,
+        status: status
+      });
+    }
   } catch (error) {
     logger.error({
       message: 'Failed to update email status in PostgreSQL',
@@ -169,6 +189,7 @@ async function updateEmailStatus(emailId, status, errorMessage = null) {
       status: status,
       error: error.message
     });
+    postgresUpdateFailures.inc({ status: status });
     // Don't throw - we don't want to block message processing for status update failures
   }
 }
