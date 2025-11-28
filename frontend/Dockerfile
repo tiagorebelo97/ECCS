@@ -54,10 +54,11 @@ WORKDIR /app
 # Docker caches layers, so unchanged package.json means cached npm install
 COPY package*.json ./
 
-# Install dependencies using npm ci for reproducible builds
-# --only=production flag is deprecated in npm 7+, using --omit=dev instead
-# npm ci uses package-lock.json for exact versions
-RUN npm ci --omit=dev && \
+# Install ALL dependencies using npm ci for reproducible builds
+# NOTE: We need all dependencies (including devDependencies like react-scripts)
+# to build the React application. The final production image only contains
+# the static build output, not node_modules, so this doesn't affect security.
+RUN npm ci && \
     # Clean npm cache to reduce image size
     npm cache clean --force
 
