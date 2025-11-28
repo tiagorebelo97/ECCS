@@ -696,6 +696,25 @@ services:
       - "--metrics.prometheus=true"
       - "--metrics.prometheus.addEntryPointsLabels=true"
       - "--metrics.prometheus.addServicesLabels=true"
+    # -------------------------------------------------------------------------
+    # Proxy Bypass Configuration
+    # -------------------------------------------------------------------------
+    # IMPORTANT: When running in environments with HTTP proxy settings
+    # (http_proxy, https_proxy), internal service-to-service communication
+    # must bypass the proxy. External proxies cannot resolve container DNS names.
+    #
+    # ISSUE: If http_proxy is set (e.g., http://158.168.230.239:3128), requests
+    # to internal services like auth-service:3002 are routed through the proxy,
+    # which returns 404 "dns_unresolved_hostname" errors.
+    #
+    # SOLUTION: Configure no_proxy to include all internal service names and
+    # common internal network addresses.
+    # -------------------------------------------------------------------------
+    environment:
+      # Bypass proxy for internal container service names
+      # This ensures health checks and ForwardAuth requests go directly to containers
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,mailpit,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,mailpit,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     ports:
       # HTTP - Main web traffic (port 8800 to avoid conflicts with commonly used port 8000)
       - "8800:8800"
