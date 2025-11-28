@@ -1,7 +1,9 @@
 # ============================================================================
-# ECCS Frontend Nginx Configuration
+# ECCS Frontend Nginx Configuration (Template)
 # ============================================================================
-# This configuration serves the React SPA and proxies API requests to Traefik.
+# This is a template file that gets processed by nginx's entrypoint script.
+# The $NGINX_LOCAL_RESOLVERS variable is populated from /etc/resolv.conf
+# by the nginx Docker/Podman entrypoint when NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 #
 # FEATURES:
 #   - Static file serving with caching
@@ -13,14 +15,15 @@
 # PODMAN COMPATIBILITY:
 #   - Uses port 3000 (unprivileged for rootless)
 #   - Runs as nginx user (non-root)
-#   - Dynamic DNS resolution for upstream services
+#   - Dynamic DNS resolution using container runtime's nameservers
 # ============================================================================
 
 # DNS resolver for dynamic upstream resolution
-# Uses Docker/Podman internal DNS (127.0.0.11) with fallback options
-# valid=30s: cache DNS results for 30 seconds
+# $NGINX_LOCAL_RESOLVERS is populated from /etc/resolv.conf by the nginx entrypoint
+# This works with both Docker (127.0.0.11) and Podman (aardvark-dns at network gateway)
+# valid=10s: short cache for DNS results to handle container restarts
 # ipv6=off: disable IPv6 resolution to avoid issues in some container networks
-resolver 127.0.0.11 valid=30s ipv6=off;
+resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
 
 server {
     # -------------------------------------------------------------------------
