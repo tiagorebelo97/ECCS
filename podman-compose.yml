@@ -1250,9 +1250,10 @@ services:
       - "587:587"
     environment:
       # Allow relay from the internal Docker network
-      - ALLOWED_SENDER_DOMAINS=${ALLOWED_SENDER_DOMAINS:-eccs.local}
+      # Note: Use a proper domain in production (not .local which is reserved for mDNS)
+      - ALLOWED_SENDER_DOMAINS=${ALLOWED_SENDER_DOMAINS:-eccs.internal}
       # Hostname for the mail server
-      - HOSTNAME=${SMTP_HOSTNAME:-mail.eccs.local}
+      - HOSTNAME=${SMTP_HOSTNAME:-mail.eccs.internal}
       # Optional: External SMTP relay for better deliverability
       # Uncomment and configure for production use
       - RELAYHOST=${SMTP_RELAY_HOST:-}
@@ -1264,8 +1265,9 @@ services:
     networks:
       - eccs-network
     healthcheck:
-      # Check if Postfix is responding on SMTP port
-      test: ["CMD-SHELL", "postfix status || exit 1"]
+      # Check if Postfix SMTP port is accessible
+      # Using nc (netcat) for reliable network-based health check
+      test: ["CMD-SHELL", "nc -z localhost 25 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5

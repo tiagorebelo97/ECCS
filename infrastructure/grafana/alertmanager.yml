@@ -33,7 +33,7 @@ global:
   # ----------------------------------------------------------------------------
   # NOTE: Uncomment and configure these for production email notifications
   # smtp_smarthost: 'postfix:25'
-  # smtp_from: 'alertmanager@eccs.local'
+  # smtp_from: 'alertmanager@eccs.internal'
   # smtp_auth_username: ''
   # smtp_auth_password: ''
   # smtp_require_tls: false
