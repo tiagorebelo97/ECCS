@@ -339,6 +339,12 @@ services:
       - KAFKA_GROUP_ID=notification-group
       # MongoDB for logging
       - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
+      # PostgreSQL connection for updating email status
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=eccs_email
+      - POSTGRES_USER=eccs_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-eccs_secure_password}
       # SMTP configuration for email delivery
       # Default: Use Mailpit container for development (no auth required)
       # Override in .env for production SMTP server
@@ -357,6 +363,8 @@ services:
       mongodb:
         condition: service_healthy
       mailpit:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     networks:
       - eccs-network
