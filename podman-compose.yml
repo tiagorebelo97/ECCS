@@ -124,6 +124,9 @@ services:
     environment:
       # API URL (used by nginx proxy, not React build)
       - REACT_APP_API_URL=http://traefik:8800
+      # Elasticsearch configuration (for frontend API access to search logs)
+      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      - ELASTICSEARCH_ENABLED=${ELASTICSEARCH_ENABLED:-true}
     # Service dependencies - frontend starts after traefik
     depends_on:
       - traefik
@@ -199,6 +202,10 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
       # Jaeger endpoint for distributed tracing
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      # Elasticsearch configuration for centralized logging
+      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      - ELASTICSEARCH_INDEX_PREFIX=${ELASTICSEARCH_INDEX_PREFIX:-eccs-logs}
+      - ELASTICSEARCH_ENABLED=${ELASTICSEARCH_ENABLED:-true}
     # Service startup order - wait for healthy dependencies
     depends_on:
       postgres:
@@ -206,6 +213,8 @@ services:
       kafka:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
     networks:
       - eccs-network
@@ -281,8 +290,14 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
       # Token expiration (short-lived for security)
       - JWT_EXPIRATION=1h
+      # Elasticsearch configuration for centralized logging
+      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      - ELASTICSEARCH_INDEX_PREFIX=${ELASTICSEARCH_INDEX_PREFIX:-eccs-logs}
+      - ELASTICSEARCH_ENABLED=${ELASTICSEARCH_ENABLED:-true}
     depends_on:
       postgres:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
     networks:
       - eccs-network
@@ -357,6 +372,10 @@ services:
       - RETRY_DELAY=5000
       # Distributed tracing
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      # Elasticsearch configuration for centralized logging
+      - ELASTICSEARCH_NODE=${ELASTICSEARCH_NODE:-http://elasticsearch:9200}
+      - ELASTICSEARCH_INDEX_PREFIX=${ELASTICSEARCH_INDEX_PREFIX:-eccs-logs}
+      - ELASTICSEARCH_ENABLED=${ELASTICSEARCH_ENABLED:-true}
     depends_on:
       kafka:
         condition: service_healthy
@@ -365,6 +384,8 @@ services:
       mailpit:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
     networks:
       - eccs-network
@@ -806,6 +827,10 @@ services:
     volumes:
       # Persistent storage for indices
       - elasticsearch_data:/usr/share/elasticsearch/data
+      # Custom Elasticsearch configuration
+      - ./infrastructure/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      # Index templates for ECCS logs
+      - ./infrastructure/elasticsearch/templates:/usr/share/elasticsearch/config/templates:ro
     ports:
       # REST API
       - "9200:9200"

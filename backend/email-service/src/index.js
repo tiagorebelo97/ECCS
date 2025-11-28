@@ -37,6 +37,7 @@ const mongoose = require('mongoose');
 const { Kafka } = require('kafkajs');
 const promClient = require('prom-client');
 const logger = require('./config/logger');
+const { checkHealth: checkElasticsearchHealth, ELASTICSEARCH_ENABLED, indexLog } = require('./config/elasticsearch');
 const emailRoutes = require('./routes/emails');
 const addressRoutes = require('./routes/addresses');
 const templateRoutes = require('./routes/templates');
@@ -155,8 +156,13 @@ app.use((req, res, next) => {
  * Health check endpoint for container orchestration.
  * Returns service status for liveness/readiness probes.
  */
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', service: 'email-service' });
+app.get('/health', async (req, res) => {
+  const elasticsearchHealth = await checkElasticsearchHealth();
+  res.status(200).json({
+    status: 'healthy',
+    service: 'email-service',
+    elasticsearch: elasticsearchHealth
+  });
 });
 
 /**
@@ -278,7 +284,8 @@ app.use((err, req, res, next) => {
  * STARTUP SEQUENCE:
  * 1. Verify PostgreSQL connection
  * 2. Connect Kafka producer
- * 3. Start HTTP server
+ * 3. Verify Elasticsearch connection
+ * 4. Start HTTP server
  */
 async function start() {
   try {
@@ -289,6 +296,23 @@ async function start() {
     // Connect Kafka producer
     await producer.connect();
     logger.info('Connected to Kafka');
+
+    // Verify Elasticsearch connection
+    if (ELASTICSEARCH_ENABLED) {
+      const esHealth = await checkElasticsearchHealth();
+      if (esHealth.status === 'green' || esHealth.status === 'yellow') {
+        logger.info(`Connected to Elasticsearch cluster: ${esHealth.clusterName}`);
+        // Log startup event to Elasticsearch
+        await indexLog('info', 'Email service started', {
+          event: 'service_startup',
+          port: PORT
+        });
+      } else {
+        logger.warn('Elasticsearch connection failed, continuing without centralized logging');
+      }
+    } else {
+      logger.info('Elasticsearch logging is disabled');
+    }
 
     // Start HTTP server
     app.listen(PORT, () => {

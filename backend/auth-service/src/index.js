@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const promClient = require('prom-client');
 const logger = require('./config/logger');
+const { checkHealth: checkElasticsearchHealth, ELASTICSEARCH_ENABLED, indexLog } = require('./config/elasticsearch');
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -30,8 +31,13 @@ app.use(cors());
 app.use(express.json());
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', service: 'auth-service' });
+app.get('/health', async (req, res) => {
+  const elasticsearchHealth = await checkElasticsearchHealth();
+  res.status(200).json({
+    status: 'healthy',
+    service: 'auth-service',
+    elasticsearch: elasticsearchHealth
+  });
 });
 
 // Metrics endpoint
@@ -66,6 +72,23 @@ async function start() {
   try {
     await pool.query('SELECT NOW()');
     logger.info('Connected to PostgreSQL');
+
+    // Verify Elasticsearch connection
+    if (ELASTICSEARCH_ENABLED) {
+      const esHealth = await checkElasticsearchHealth();
+      if (esHealth.status === 'green' || esHealth.status === 'yellow') {
+        logger.info(`Connected to Elasticsearch cluster: ${esHealth.clusterName}`);
+        // Log startup event to Elasticsearch
+        await indexLog('info', 'Auth service started', {
+          event: 'service_startup',
+          port: PORT
+        });
+      } else {
+        logger.warn('Elasticsearch connection failed, continuing without centralized logging');
+      }
+    } else {
+      logger.info('Elasticsearch logging is disabled');
+    }
 
     app.listen(PORT, () => {
       logger.info(`Auth service listening on port ${PORT}`);

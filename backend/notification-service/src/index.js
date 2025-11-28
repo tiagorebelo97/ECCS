@@ -49,6 +49,7 @@ const { Kafka } = require('kafkajs');
 const { Pool } = require('pg');
 const promClient = require('prom-client');
 const logger = require('./config/logger');
+const { checkHealth: checkElasticsearchHealth, ELASTICSEARCH_ENABLED, indexLog } = require('./config/elasticsearch');
 const EmailProcessor = require('./services/emailProcessor');
 const { initTracer } = require('./config/tracer');
 
@@ -119,8 +120,13 @@ const postgresUpdateFailures = new promClient.Counter({
  * Health check endpoint for container orchestration (Kubernetes, Docker).
  * Returns service status for liveness/readiness probes.
  */
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', service: 'notification-service' });
+app.get('/health', async (req, res) => {
+  const elasticsearchHealth = await checkElasticsearchHealth();
+  res.status(200).json({
+    status: 'healthy',
+    service: 'notification-service',
+    elasticsearch: elasticsearchHealth
+  });
 });
 
 /**
@@ -790,6 +796,26 @@ async function start() {
     logger.info('Connecting to PostgreSQL...');
     await pool.query('SELECT NOW()');
     logger.info('Successfully connected to PostgreSQL');
+
+    // ========================================================================
+    // ELASTICSEARCH CONNECTION
+    // ========================================================================
+    // Elasticsearch is used for centralized logging across all services
+    if (ELASTICSEARCH_ENABLED) {
+      const esHealth = await checkElasticsearchHealth();
+      if (esHealth.status === 'green' || esHealth.status === 'yellow') {
+        logger.info(`Connected to Elasticsearch cluster: ${esHealth.clusterName}`);
+        // Log startup event to Elasticsearch
+        await indexLog('info', 'Notification service started', {
+          event: 'service_startup',
+          port: PORT
+        });
+      } else {
+        logger.warn('Elasticsearch connection failed, continuing without centralized logging');
+      }
+    } else {
+      logger.info('Elasticsearch logging is disabled');
+    }
 
     // ========================================================================
     // KAFKA CONSUMER STARTUP
