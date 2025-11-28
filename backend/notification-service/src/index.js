@@ -46,6 +46,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const { Kafka } = require('kafkajs');
+const { Pool } = require('pg');
 const promClient = require('prom-client');
 const logger = require('./config/logger');
 const EmailProcessor = require('./services/emailProcessor');
@@ -100,6 +101,16 @@ const retryQueueDepth = new promClient.Gauge({
   help: 'Current number of emails in retry queue'
 });
 
+/**
+ * Counter metric for tracking PostgreSQL status update failures.
+ * Used to monitor data synchronization issues between MongoDB and PostgreSQL.
+ */
+const postgresUpdateFailures = new promClient.Counter({
+  name: 'postgres_email_status_update_failures_total',
+  help: 'Total number of failed PostgreSQL email status updates',
+  labelNames: ['status']
+});
+
 // ============================================================================
 // HEALTH CHECK AND METRICS ENDPOINTS
 // ============================================================================
@@ -120,6 +131,68 @@ app.get('/metrics', async (req, res) => {
   res.set('Content-Type', promClient.register.contentType);
   res.end(await promClient.register.metrics());
 });
+
+// ============================================================================
+// POSTGRESQL CONNECTION FOR EMAIL STATUS UPDATES
+// ============================================================================
+
+/**
+ * PostgreSQL connection pool for updating email status in the emails table.
+ * After processing an email (success or failure), we update the status
+ * from 'pending' to 'sent' or 'failed' in the PostgreSQL database.
+ */
+const pool = new Pool({
+  host: process.env.POSTGRES_HOST,
+  port: process.env.POSTGRES_PORT || 5432,
+  database: process.env.POSTGRES_DB || 'eccs_email',
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
+});
+
+/**
+ * Updates the email status in PostgreSQL after processing.
+ *
+ * @param {number} emailId - The email ID to update
+ * @param {string} status - New status ('sent' or 'failed')
+ * @param {string|null} errorMessage - Error message if failed
+ */
+async function updateEmailStatus(emailId, status, errorMessage = null) {
+  try {
+    const query = `
+      UPDATE emails
+      SET status = $1,
+          sent_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE sent_at END,
+          error_message = $2,
+          updated_at = NOW()
+      WHERE id = $3
+    `;
+    const result = await pool.query(query, [status, errorMessage, emailId]);
+
+    if (result.rowCount === 0) {
+      logger.warn({
+        message: 'Email status update affected no rows - email may not exist',
+        emailId: emailId,
+        status: status
+      });
+      postgresUpdateFailures.inc({ status: status });
+    } else {
+      logger.info({
+        message: 'Email status updated in PostgreSQL',
+        emailId: emailId,
+        status: status
+      });
+    }
+  } catch (error) {
+    logger.error({
+      message: 'Failed to update email status in PostgreSQL',
+      emailId: emailId,
+      status: status,
+      error: error.message
+    });
+    postgresUpdateFailures.inc({ status: status });
+    // Don't throw - we don't want to block message processing for status update failures
+  }
+}
 
 // ============================================================================
 // KAFKA CONFIGURATION
@@ -346,6 +419,9 @@ async function processMessage(message, attempt = 1) {
       processedAt: new Date()
     });
 
+    // Update email status in PostgreSQL from 'pending' to 'sent'
+    await updateEmailStatus(emailData.id, 'sent', null);
+
   } catch (error) {
     // ========================================================================
     // FAILURE PATH - RETRY OR DLQ DECISION
@@ -400,6 +476,9 @@ async function processMessage(message, attempt = 1) {
         sentToDlq: true,
         processedAt: new Date()
       });
+
+      // Update email status in PostgreSQL from 'pending' to 'failed'
+      await updateEmailStatus(emailData.id, 'failed', error.message);
     }
 
     // Record failure latency for SLA monitoring
@@ -705,6 +784,14 @@ async function start() {
     logger.info('Successfully connected to MongoDB');
 
     // ========================================================================
+    // POSTGRESQL CONNECTION
+    // ========================================================================
+    // PostgreSQL is used to update email status after processing
+    logger.info('Connecting to PostgreSQL...');
+    await pool.query('SELECT NOW()');
+    logger.info('Successfully connected to PostgreSQL');
+
+    // ========================================================================
     // KAFKA CONSUMER STARTUP
     // ========================================================================
     // This begins the message processing loop
@@ -767,6 +854,10 @@ const shutdown = async (signal) => {
     // Close MongoDB connection
     logger.info('Closing MongoDB connection...');
     await mongoose.disconnect();
+
+    // Close PostgreSQL connection
+    logger.info('Closing PostgreSQL connection...');
+    await pool.end();
 
     logger.info('Graceful shutdown completed');
     process.exit(0);
