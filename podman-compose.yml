@@ -199,6 +199,9 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
       # Jaeger endpoint for distributed tracing
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      # Logstash connection for centralized logging (ELK stack)
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
     # Service startup order - wait for healthy dependencies
     depends_on:
       postgres:
@@ -206,6 +209,8 @@ services:
       kafka:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      logstash:
         condition: service_healthy
     networks:
       - eccs-network
@@ -281,8 +286,13 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
       # Token expiration (short-lived for security)
       - JWT_EXPIRATION=1h
+      # Logstash connection for centralized logging (ELK stack)
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
     depends_on:
       postgres:
+        condition: service_healthy
+      logstash:
         condition: service_healthy
     networks:
       - eccs-network
@@ -357,6 +367,9 @@ services:
       - RETRY_DELAY=5000
       # Distributed tracing
       - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      # Logstash connection for centralized logging (ELK stack)
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
     depends_on:
       kafka:
         condition: service_healthy
@@ -365,6 +378,8 @@ services:
       postfix:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      logstash:
         condition: service_healthy
     networks:
       - eccs-network
@@ -962,6 +977,186 @@ services:
       retries: 5
       start_period: 120s
     restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # ELK Initialization Service - One-time setup for Elasticsearch and Kibana
+  # --------------------------------------------------------------------------
+  # This service runs once on startup to configure:
+  # 1. Elasticsearch ILM (Index Lifecycle Management) policies
+  # 2. Index templates for consistent field mappings
+  # 3. Kibana saved objects (index patterns, visualizations, dashboards)
+  #
+  # IMPORTANT:
+  # This service exits after initialization. Container restart policy is
+  # "no" so it doesn't restart after successful completion.
+  #
+  # MANUAL RE-RUN:
+  # To manually re-run initialization:
+  #   podman-compose run --rm elk-init
+  # --------------------------------------------------------------------------
+  elk-init:
+    image: curlimages/curl:8.4.0
+    container_name: eccs-elk-init
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./infrastructure/elasticsearch/templates:/elasticsearch/templates:ro
+      - ./infrastructure/kibana/saved-objects:/kibana/saved-objects:ro
+    environment:
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - KIBANA_HOST=http://kibana:5601
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "=============================================="
+        echo "   ECCS ELK Stack Initialization"
+        echo "=============================================="
+        
+        # Wait for Elasticsearch
+        echo "[INFO] Waiting for Elasticsearch..."
+        until curl -s "http://elasticsearch:9200/_cluster/health" | grep -q '"status"'; do
+          echo "[INFO] Elasticsearch not ready yet..."
+          sleep 5
+        done
+        echo "[SUCCESS] Elasticsearch is ready"
+        
+        # Wait for Kibana
+        echo "[INFO] Waiting for Kibana..."
+        until curl -s "http://kibana:5601/api/status" | grep -q '"level":"available"'; do
+          echo "[INFO] Kibana not ready yet..."
+          sleep 5
+        done
+        echo "[SUCCESS] Kibana is ready"
+        
+        # Create ILM policy
+        echo "[INFO] Creating ILM policy..."
+        curl -s -X PUT "http://elasticsearch:9200/_ilm/policy/eccs-logs-policy" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "policy": {
+              "phases": {
+                "hot": {
+                  "min_age": "0ms",
+                  "actions": {
+                    "rollover": {
+                      "max_primary_shard_size": "50gb",
+                      "max_age": "30d"
+                    }
+                  }
+                },
+                "warm": {
+                  "min_age": "30d",
+                  "actions": {
+                    "shrink": {
+                      "number_of_shards": 1
+                    },
+                    "forcemerge": {
+                      "max_num_segments": 1
+                    }
+                  }
+                },
+                "delete": {
+                  "min_age": "90d",
+                  "actions": {
+                    "delete": {}
+                  }
+                }
+              }
+            }
+          }'
+        echo ""
+        echo "[SUCCESS] ILM policy created"
+        
+        # Create index template
+        echo "[INFO] Creating index template..."
+        curl -s -X PUT "http://elasticsearch:9200/_index_template/eccs-logs-template" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "index_patterns": ["eccs-logs-*", "eccs-email-logs-*", "eccs-app-logs-*"],
+            "priority": 100,
+            "template": {
+              "settings": {
+                "number_of_shards": 1,
+                "number_of_replicas": 0,
+                "refresh_interval": "5s",
+                "index.lifecycle.name": "eccs-logs-policy"
+              },
+              "mappings": {
+                "dynamic": "true",
+                "properties": {
+                  "@timestamp": { "type": "date" },
+                  "level": { "type": "keyword" },
+                  "service": { "type": "keyword" },
+                  "message": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+                  "status": { "type": "keyword" },
+                  "emailId": { "type": "keyword" },
+                  "userId": { "type": "keyword" },
+                  "latencyMs": { "type": "long" },
+                  "error_category": { "type": "keyword" },
+                  "errorCode": { "type": "keyword" },
+                  "errorMessage": { "type": "text" },
+                  "is_retry": { "type": "boolean" },
+                  "sentToDlq": { "type": "boolean" },
+                  "attempt": { "type": "integer" },
+                  "provider": { "type": "keyword" },
+                  "latency_bucket": { "type": "keyword" }
+                }
+              }
+            }
+          }'
+        echo ""
+        echo "[SUCCESS] Index template created"
+        
+        # Create initial indices
+        echo "[INFO] Creating initial indices..."
+        curl -s -X PUT "http://elasticsearch:9200/eccs-logs-000001" \
+          -H "Content-Type: application/json" \
+          -d '{"aliases": {"eccs-logs": {"is_write_index": true}}}' || true
+        curl -s -X PUT "http://elasticsearch:9200/eccs-email-logs-000001" \
+          -H "Content-Type: application/json" \
+          -d '{"aliases": {"eccs-email-logs": {"is_write_index": true}}}' || true
+        curl -s -X PUT "http://elasticsearch:9200/eccs-app-logs-000001" \
+          -H "Content-Type: application/json" \
+          -d '{"aliases": {"eccs-app-logs": {"is_write_index": true}}}' || true
+        echo ""
+        echo "[SUCCESS] Initial indices created"
+        
+        # Import Kibana saved objects
+        echo "[INFO] Importing Kibana index patterns..."
+        curl -s -X POST "http://kibana:5601/api/saved_objects/_import?overwrite=true" \
+          -H "kbn-xsrf: true" \
+          -F "file=@/kibana/saved-objects/index-patterns.ndjson"
+        echo ""
+        
+        echo "[INFO] Importing Kibana dashboards..."
+        curl -s -X POST "http://kibana:5601/api/saved_objects/_import?overwrite=true" \
+          -H "kbn-xsrf: true" \
+          -F "file=@/kibana/saved-objects/email-dashboards.ndjson"
+        echo ""
+        
+        echo "=============================================="
+        echo "[SUCCESS] ELK Stack initialization complete!"
+        echo "=============================================="
+        echo ""
+        echo "Access Kibana at: http://localhost:5601"
+        echo ""
+        echo "Available dashboards:"
+        echo "  - [ECCS] Email Processing Dashboard"
+        echo ""
+        echo "Important Kibana filters:"
+        echo "  - service:email-service"
+        echo "  - service:auth-service"
+        echo "  - service:notification-service"
+        echo "  - level:error"
+        echo "  - status:failed OR status:retry"
+        echo ""
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+    networks:
+      - eccs-network
+    restart: "no"
 
   # ==========================================================================
   # OBSERVABILITY STACK - METRICS AND TRACING

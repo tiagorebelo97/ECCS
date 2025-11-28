@@ -225,6 +225,34 @@ For detailed documentation, see [docs/MONITORING_ALERTING.md](docs/MONITORING_AL
 ### Distributed Tracing
 Jaeger provides end-to-end request tracing across services.
 
+### Centralized Logging with ELK Stack
+All backend services (email-service, auth-service, notification-service) send structured JSON logs to Elasticsearch via Logstash for centralized monitoring and analysis.
+
+**Features:**
+- Automatic ELK stack initialization on first startup
+- Pre-configured Kibana dashboards for email processing
+- Index Lifecycle Management (ILM) with 90-day retention
+- Daily log rotation
+
+**Access Kibana at:** http://localhost:5601
+
+**Pre-configured Dashboards:**
+- **[ECCS] Email Processing Dashboard** - Error rates, latency metrics, retry analysis
+
+**Useful Kibana Filters:**
+- `service:email-service` - Email service logs
+- `service:auth-service` - Authentication service logs  
+- `service:notification-service` - Email processing logs
+- `level:error` - Show only errors
+- `status:failed OR status:retry` - Failed email deliveries
+- `latencyMs:[5000 TO *]` - Slow processing (>5 seconds)
+- `sentToDlq:true` - Dead letter queue entries
+
+**Manual Initialization (if needed):**
+```bash
+./scripts/init-elk.sh
+```
+
 ## 🔐 Security
 
 - JWT-based authentication
@@ -289,11 +317,13 @@ GitHub Actions workflow includes:
 |----------|-------------|---------|
 | `POSTGRES_PASSWORD` | PostgreSQL password | - |
 | `JWT_SECRET` | JWT signing secret | - |
-| `SMTP_HOST` | SMTP server host | - |
-| `SMTP_PORT` | SMTP server port | 587 |
+| `SMTP_HOST` | SMTP server host | postfix |
+| `SMTP_PORT` | SMTP server port | 25 |
 | `SMTP_USER` | SMTP username | - |
 | `SMTP_PASS` | SMTP password | - |
 | `GRAFANA_PASSWORD` | Grafana admin password | admin123 |
+| `LOGSTASH_HOST` | Logstash server host | logstash |
+| `LOGSTASH_PORT` | Logstash TCP port | 5000 |
 
 ## 🤝 Contributing
 
