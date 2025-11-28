@@ -86,13 +86,18 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         
-        # Preserve original host header
-        proxy_set_header Host $host;
+        # Set Host header to api.localhost so Traefik routes match
+        # Traefik uses Host-based routing rules (e.g., Host(`api.localhost`))
+        # Without this, requests would fail as the original host (e.g., 158.168.230.244:3000)
+        # doesn't match any Traefik router rules
+        proxy_set_header Host api.localhost;
         
         # Forward real client IP
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # Preserve original host in X-Forwarded-Host for backend services
+        proxy_set_header X-Forwarded-Host $host;
         
         # Bypass cache for API requests
         proxy_cache_bypass $http_upgrade;
