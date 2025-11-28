@@ -101,7 +101,10 @@ RUN apk update && \
     # Create templates directory for dynamic configuration
     mkdir -p /etc/nginx/templates && \
     # Ensure nginx user owns required directories for rootless operation
-    chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/templates
+    # NOTE: /etc/nginx/conf.d must be writable by nginx user because the
+    # nginx entrypoint script (20-envsubst-on-templates.sh) processes templates
+    # from /etc/nginx/templates and writes the output to /etc/nginx/conf.d
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/templates /etc/nginx/conf.d
 
 # Copy built React application from builder stage
 # --chown ensures files are owned by nginx user for security
