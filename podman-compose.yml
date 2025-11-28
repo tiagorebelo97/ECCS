@@ -202,15 +202,16 @@ services:
       # Logstash connection for centralized logging (ELK stack)
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5000
-    # Service startup order - wait for healthy dependencies
+    # Service dependencies - wait for healthy dependencies
+    # NOTE: Logstash dependency removed because it's non-critical for service operation.
+    # The service uses winston-logstash with infinite retries (max_connect_retries: -1),
+    # so it will gracefully reconnect when logstash becomes available.
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
       mongodb:
-        condition: service_healthy
-      logstash:
         condition: service_healthy
     networks:
       - eccs-network
@@ -289,10 +290,11 @@ services:
       # Logstash connection for centralized logging (ELK stack)
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5000
+    # NOTE: Logstash dependency removed because it's non-critical for service operation.
+    # The service uses winston-logstash with infinite retries (max_connect_retries: -1),
+    # so it will gracefully reconnect when logstash becomes available.
     depends_on:
       postgres:
-        condition: service_healthy
-      logstash:
         condition: service_healthy
     networks:
       - eccs-network
@@ -370,6 +372,9 @@ services:
       # Logstash connection for centralized logging (ELK stack)
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5000
+    # NOTE: Logstash dependency removed because it's non-critical for service operation.
+    # The service uses winston-logstash with infinite retries (max_connect_retries: -1),
+    # so it will gracefully reconnect when logstash becomes available.
     depends_on:
       kafka:
         condition: service_healthy
@@ -378,8 +383,6 @@ services:
       postfix:
         condition: service_healthy
       postgres:
-        condition: service_healthy
-      logstash:
         condition: service_healthy
     networks:
       - eccs-network
