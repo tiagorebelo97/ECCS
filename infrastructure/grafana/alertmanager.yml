@@ -32,8 +32,8 @@ global:
   # Global SMTP Configuration (for email notifications)
   # ----------------------------------------------------------------------------
   # NOTE: Uncomment and configure these for production email notifications
-  # smtp_smarthost: 'mailpit:1025'
-  # smtp_from: 'alertmanager@eccs.example.com'
+  # smtp_smarthost: 'postfix:25'
+  # smtp_from: 'alertmanager@eccs.local'
   # smtp_auth_username: ''
   # smtp_auth_password: ''
   # smtp_require_tls: false

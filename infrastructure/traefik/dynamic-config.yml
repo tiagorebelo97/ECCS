@@ -350,14 +350,6 @@ http:
           - url: "http://jaeger:16686"
         passHostHeader: true
 
-    # Mailpit service
-    # ROUTING: Handles requests to mailpit.localhost
-    mailpit:
-      loadBalancer:
-        servers:
-          - url: "http://mailpit:8025"
-        passHostHeader: true
-
     # Alertmanager service
     # ROUTING: Handles requests to alertmanager.localhost
     alertmanager:
@@ -495,19 +487,6 @@ http:
     jaeger-router:
       rule: "Host(`jaeger.localhost`)"
       service: jaeger
-      middlewares:
-        - security-headers
-      entryPoints:
-        - web
-      priority: 5
-
-    # -------------------------------------------------------------------------
-    # Mailpit Router
-    # -------------------------------------------------------------------------
-    # ROUTING: mailpit.localhost -> mailpit:8025
-    mailpit-router:
-      rule: "Host(`mailpit.localhost`)"
-      service: mailpit
       middlewares:
         - security-headers
       entryPoints:
