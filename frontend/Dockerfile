@@ -98,8 +98,10 @@ RUN apk update && \
     rm -f /etc/nginx/conf.d/default.conf && \
     # Create cache directory for nginx temp files (needed for non-root operation)
     mkdir -p /var/cache/nginx && \
+    # Create templates directory for dynamic configuration
+    mkdir -p /etc/nginx/templates && \
     # Ensure nginx user owns required directories for rootless operation
-    chown -R nginx:nginx /var/cache/nginx /var/log/nginx
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/templates
 
 # Copy built React application from builder stage
 # --chown ensures files are owned by nginx user for security
@@ -109,9 +111,15 @@ COPY --from=builder --chown=nginx:nginx /app/build /usr/share/nginx/html
 # This removes the "user" directive and sets PID file to writable location
 COPY --chown=nginx:nginx nginx-main.conf /etc/nginx/nginx.conf
 
-# Copy custom nginx server configuration
-# This includes security headers and proper routing for SPA
-COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx server configuration template for Docker/Podman DNS compatibility
+# The template uses $NGINX_LOCAL_RESOLVERS which is populated from /etc/resolv.conf
+# by the nginx entrypoint when NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+COPY --chown=nginx:nginx nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# Set environment variables for nginx template processing
+# NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1: Extract DNS resolvers from /etc/resolv.conf
+# This enables automatic DNS resolver detection for both Docker and Podman
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
 # HEALTHCHECK: Container health monitoring
 # Podman and orchestrators use this to verify container is running properly
@@ -135,6 +143,9 @@ USER nginx
 # This ensures SIGTERM is properly forwarded to nginx for graceful shutdown
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-# Start nginx in foreground mode (required for containers)
-# -g 'daemon off;' prevents nginx from daemonizing
-CMD ["nginx", "-g", "daemon off;"]
+# Start nginx via the official entrypoint script to enable template processing
+# The entrypoint script:
+# 1. Sources /docker-entrypoint.d/15-local-resolvers.envsh to set NGINX_LOCAL_RESOLVERS
+# 2. Runs /docker-entrypoint.d/20-envsubst-on-templates.sh to process templates
+# 3. Executes nginx with the provided arguments
+CMD ["/docker-entrypoint.sh", "nginx", "-g", "daemon off;"]
