@@ -299,9 +299,8 @@ http:
         # RELIABILITY: Removes unhealthy instances from rotation
         healthCheck:
           path: "/health"
-          scheme: "http"
           interval: "10s"
-          timeout: "3s"
+          timeout: "5s"
         servers:
           - url: "http://email-service:3001"
         # Pass host header for virtual hosting
@@ -313,9 +312,8 @@ http:
       loadBalancer:
         healthCheck:
           path: "/health"
-          scheme: "http"
           interval: "10s"
-          timeout: "3s"
+          timeout: "5s"
         servers:
           - url: "http://auth-service:3002"
         passHostHeader: true
