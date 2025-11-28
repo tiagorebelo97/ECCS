@@ -298,7 +298,8 @@ http:
         # Health check configuration
         # RELIABILITY: Removes unhealthy instances from rotation
         healthCheck:
-          path: /health
+          path: "/health"
+          scheme: "http"
           interval: "10s"
           timeout: "3s"
         servers:
@@ -311,7 +312,8 @@ http:
     auth-service:
       loadBalancer:
         healthCheck:
-          path: /health
+          path: "/health"
+          scheme: "http"
           interval: "10s"
           timeout: "3s"
         servers:
