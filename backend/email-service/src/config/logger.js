@@ -16,7 +16,12 @@
  *
  * LOG DESTINATIONS:
  * - Development: Console with colors
- * - Production: Console (JSON) + File rotation
+ * - Production: Console (JSON) + File rotation + Logstash
+ *
+ * ELASTICSEARCH INTEGRATION:
+ * In production, logs are sent to Logstash via TCP for indexing in
+ * Elasticsearch. This enables centralized log aggregation and visualization
+ * in Kibana with pre-configured dashboards.
  *
  * STRUCTURED LOGGING:
  * All log entries include:
@@ -32,6 +37,7 @@
  */
 
 const winston = require('winston');
+require('winston-logstash');
 
 /**
  * Custom log format for JSON output.
@@ -129,6 +135,32 @@ if (process.env.NODE_ENV === 'production') {
     maxFiles: 10,               // Keep 10 rotated files
     format: jsonFormat
   }));
+
+  /**
+   * Logstash transport - sends logs to ELK stack for centralized monitoring.
+   * Logs are indexed in Elasticsearch and visualized in Kibana.
+   * 
+   * CONFIGURATION:
+   * - LOGSTASH_HOST: Hostname of Logstash server (default: logstash)
+   * - LOGSTASH_PORT: TCP port for log ingestion (default: 5000)
+   * 
+   * IMPORTANT FILTERS IN KIBANA:
+   * - service:email-service - Filter logs from this service
+   * - level:error - Show only errors
+   * - tags:email-service - Filter by service tag
+   */
+  if (process.env.LOGSTASH_HOST || process.env.NODE_ENV === 'production') {
+    logger.add(new winston.transports.Logstash({
+      port: parseInt(process.env.LOGSTASH_PORT) || 5000,
+      host: process.env.LOGSTASH_HOST || 'logstash',
+      node_name: 'email-service',
+      max_connect_retries: -1,  // Retry indefinitely
+      timeout_connect_retries: 5000  // Wait 5s between retries
+    }));
+    
+    // Log connection status (only once at startup)
+    console.log(`[email-service] Logstash transport configured: ${process.env.LOGSTASH_HOST || 'logstash'}:${process.env.LOGSTASH_PORT || 5000}`);
+  }
 }
 
 // ============================================================================
