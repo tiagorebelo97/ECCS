@@ -59,20 +59,20 @@ log.format: json
 # -----------------------------------------------------------------------------
 # Monitoring Settings
 # -----------------------------------------------------------------------------
-# Enable internal metrics collection
-monitoring.enabled: true
-
-# Disable X-Pack monitoring to Elasticsearch to avoid connection errors
-# The licensereader errors occur because X-Pack monitoring tries to connect
+# Disable internal metrics collection to Elasticsearch to avoid connection errors
+# The licensereader errors occur because monitoring tries to connect
 # to localhost:9200 by default. Since we're using the free/basic license and
-# don't need X-Pack monitoring features, we disable it.
+# don't need internal monitoring features, we disable it.
 # Metrics are still available via the HTTP API at port 9600.
-xpack.monitoring.enabled: false
+#
+# NOTE: In Logstash 8.x, 'xpack.monitoring.enabled' is deprecated and replaced
+# by 'monitoring.enabled'. Only one of these settings should be configured.
+monitoring.enabled: false
 
-# Alternative: Enable X-Pack monitoring to the Elasticsearch container
-# Uncomment these lines if you want to enable X-Pack monitoring:
-# xpack.monitoring.enabled: true
-# xpack.monitoring.elasticsearch.hosts: ["http://elasticsearch:9200"]
+# Alternative: Enable monitoring to the Elasticsearch container
+# Uncomment these lines if you want to enable monitoring:
+# monitoring.enabled: true
+# monitoring.elasticsearch.hosts: ["http://elasticsearch:9200"]
 
 # -----------------------------------------------------------------------------
 # Dead Letter Queue Settings
