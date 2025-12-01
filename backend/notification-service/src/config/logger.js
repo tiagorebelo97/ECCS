@@ -45,7 +45,7 @@
  */
 
 const winston = require('winston');
-require('winston-logstash');
+const LogstashTransport = require('winston-logstash/lib/winston-logstash-latest');
 
 /**
  * Custom log format for JSON output.
@@ -161,7 +161,7 @@ if (process.env.NODE_ENV === 'production') {
    * - sentToDlq:true - Dead letter queue entries
    */
   if (process.env.LOGSTASH_HOST || process.env.NODE_ENV === 'production') {
-    logger.add(new winston.transports.Logstash({
+    logger.add(new LogstashTransport({
       port: parseInt(process.env.LOGSTASH_PORT, 10) || 5000,
       host: process.env.LOGSTASH_HOST || 'logstash',
       node_name: 'notification-service',
