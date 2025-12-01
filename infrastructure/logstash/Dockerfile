@@ -72,8 +72,14 @@ COPY pipeline/ /usr/share/logstash/pipeline/
 # Copy patterns for grok parsing
 COPY patterns/ /usr/share/logstash/patterns/
 
-# Ensure proper permissions
-RUN chown -R logstash:logstash /usr/share/logstash/config/ && \
+# Create log directory and ensure proper permissions
+# The /var/log/logstash directory is required for Logstash's rolling file appenders
+# configured in log4j2.properties. Without this, Logstash fails with errors:
+# - "Could not create directory /var/log/logstash"
+# - "Unable to create file /var/log/logstash/logstash-json.log"
+RUN mkdir -p /var/log/logstash && \
+    chown -R logstash:logstash /var/log/logstash && \
+    chown -R logstash:logstash /usr/share/logstash/config/ && \
     chown -R logstash:logstash /usr/share/logstash/pipeline/ && \
     chown -R logstash:logstash /usr/share/logstash/patterns/ 2>/dev/null || true
 
