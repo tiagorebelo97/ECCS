@@ -923,6 +923,15 @@ services:
       # MongoDB connection for mongodb-logs pipeline
       # Used to read email_logs and application_logs collections
       - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
+      # -----------------------------------------------------------------------
+      # Proxy Bypass Configuration
+      # -----------------------------------------------------------------------
+      # When HTTP proxy environment variables are set at the system level,
+      # internal service-to-service communication must bypass the proxy.
+      # External proxies cannot resolve container DNS names like 'elasticsearch'.
+      # -----------------------------------------------------------------------
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -982,6 +991,15 @@ services:
       - SERVER_HOST=0.0.0.0
       # Disable telemetry
       - TELEMETRY_ENABLED=false
+      # -----------------------------------------------------------------------
+      # Proxy Bypass Configuration
+      # -----------------------------------------------------------------------
+      # When HTTP proxy environment variables are set at the system level,
+      # internal service-to-service communication must bypass the proxy.
+      # External proxies cannot resolve container DNS names like 'elasticsearch'.
+      # -----------------------------------------------------------------------
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     ports:
       - "5601:5601"
     depends_on:
@@ -1027,6 +1045,15 @@ services:
     environment:
       - ELASTICSEARCH_HOST=http://elasticsearch:9200
       - KIBANA_HOST=http://kibana:5601
+      # -----------------------------------------------------------------------
+      # Proxy Bypass Configuration
+      # -----------------------------------------------------------------------
+      # When HTTP proxy environment variables are set at the system level,
+      # internal service-to-service communication must bypass the proxy.
+      # External proxies cannot resolve container DNS names like 'elasticsearch'.
+      # -----------------------------------------------------------------------
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -1207,6 +1234,15 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       # Disable anonymous access
       - GF_AUTH_ANONYMOUS_ENABLED=false
+      # -----------------------------------------------------------------------
+      # Proxy Bypass Configuration
+      # -----------------------------------------------------------------------
+      # When HTTP proxy environment variables are set at the system level,
+      # internal service-to-service communication must bypass the proxy.
+      # External proxies cannot resolve container DNS names like 'prometheus'.
+      # -----------------------------------------------------------------------
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     volumes:
       # Persistent storage for dashboards and settings
       - grafana_data:/var/lib/grafana
@@ -1248,6 +1284,16 @@ services:
   prometheus:
     image: docker.io/prom/prometheus:v2.47.0
     container_name: eccs-prometheus
+    # -------------------------------------------------------------------------
+    # Proxy Bypass Configuration
+    # -------------------------------------------------------------------------
+    # When HTTP proxy environment variables are set at the system level,
+    # internal service-to-service communication must bypass the proxy.
+    # Prometheus scrapes metrics from internal services via container DNS names.
+    # -------------------------------------------------------------------------
+    environment:
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     volumes:
       # Prometheus configuration
       - ./infrastructure/grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -1297,6 +1343,14 @@ services:
       - COLLECTOR_OTLP_ENABLED=true
       # Memory storage (use Elasticsearch for production)
       - SPAN_STORAGE_TYPE=memory
+      # -----------------------------------------------------------------------
+      # Proxy Bypass Configuration
+      # -----------------------------------------------------------------------
+      # When HTTP proxy environment variables are set at the system level,
+      # internal service-to-service communication must bypass the proxy.
+      # -----------------------------------------------------------------------
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     ports:
       # Jaeger UI
       - "16686:16686"
@@ -1395,6 +1449,16 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.26.0
     container_name: eccs-alertmanager
+    # -------------------------------------------------------------------------
+    # Proxy Bypass Configuration
+    # -------------------------------------------------------------------------
+    # When HTTP proxy environment variables are set at the system level,
+    # internal service-to-service communication must bypass the proxy.
+    # Alertmanager may need to communicate with internal services.
+    # -------------------------------------------------------------------------
+    environment:
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     volumes:
       # Alertmanager configuration
       - ./infrastructure/grafana/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
