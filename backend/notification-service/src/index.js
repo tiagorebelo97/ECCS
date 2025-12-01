@@ -158,6 +158,18 @@ const pool = new Pool({
  */
 async function updateEmailStatus(emailId, status, errorMessage = null) {
   try {
+    // Ensure emailId is a valid positive integer for PostgreSQL query consistency
+    const numericEmailId = parseInt(emailId, 10);
+    if (isNaN(numericEmailId) || numericEmailId <= 0) {
+      logger.warn({
+        message: 'Invalid emailId - must be a positive integer',
+        emailId: emailId,
+        status: status
+      });
+      postgresUpdateFailures.inc({ status: status });
+      return;
+    }
+
     const query = `
       UPDATE emails
       SET status = $1,
@@ -166,7 +178,7 @@ async function updateEmailStatus(emailId, status, errorMessage = null) {
           updated_at = NOW()
       WHERE id = $3
     `;
-    const result = await pool.query(query, [status, errorMessage, emailId]);
+    const result = await pool.query(query, [status, errorMessage, numericEmailId]);
 
     if (result.rowCount === 0) {
       logger.warn({

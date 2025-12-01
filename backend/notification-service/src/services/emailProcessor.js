@@ -171,8 +171,12 @@ class EmailProcessor {
           },
           // TLS configuration for security
           tls: {
-            // Reject unauthorized certificates in production
-            rejectUnauthorized: process.env.NODE_ENV === 'production',
+            // Reject unauthorized certificates based on environment config
+            // SMTP_TLS_REJECT_UNAUTHORIZED allows explicit control (true/false)
+            // Falls back to rejecting only in production if not set
+            rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== undefined
+              ? process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true'
+              : process.env.NODE_ENV === 'production',
             // Minimum TLS version for security
             minVersion: 'TLSv1.2'
           },
