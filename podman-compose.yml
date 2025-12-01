@@ -370,6 +370,12 @@ services:
       - SMTP_PORT=${SMTP_PORT:-25}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-noreply@eccs.internal}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-ECCS Email Service}
+      # TLS configuration: Allow self-signed certificates for internal Postfix
+      # Set to 'true' in production with valid certificates
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_TLS_REJECT_UNAUTHORIZED=${SMTP_TLS_REJECT_UNAUTHORIZED:-false}
       # Retry configuration
       - RETRY_ATTEMPTS=3
       - RETRY_DELAY=5000

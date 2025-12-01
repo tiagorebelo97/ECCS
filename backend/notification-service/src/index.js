@@ -170,15 +170,18 @@ async function updateEmailStatus(emailId, status, errorMessage = null) {
       return;
     }
 
+    // Ensure status is a string for consistent type inference
+    const statusString = String(status);
+
     const query = `
       UPDATE emails
-      SET status = $1,
-          sent_at = CASE WHEN $1 = 'sent' THEN NOW() ELSE sent_at END,
+      SET status = $1::VARCHAR,
+          sent_at = CASE WHEN $1::VARCHAR = 'sent' THEN NOW() ELSE sent_at END,
           error_message = $2,
           updated_at = NOW()
       WHERE id = $3
     `;
-    const result = await pool.query(query, [status, errorMessage, numericEmailId]);
+    const result = await pool.query(query, [statusString, errorMessage, numericEmailId]);
 
     if (result.rowCount === 0) {
       logger.warn({
