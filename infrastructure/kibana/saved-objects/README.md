@@ -4,12 +4,14 @@ This directory contains pre-configured Kibana saved objects for monitoring the E
 
 ## Contents
 
-### Index Patterns
+### Data Views
 
 | File | Description |
 |------|-------------|
-| `index-patterns.ndjson` | General logs index pattern (`eccs-logs-*`) for real-time log ingestion |
-| `email-dashboards.ndjson` | Contains index patterns for MongoDB logs: `eccs-email-logs-*` and `eccs-app-logs-*` |
+| `index-patterns.ndjson` | General logs data view (`eccs-logs-*`) for real-time log ingestion |
+| `email-dashboards.ndjson` | Contains data views for MongoDB logs: `eccs-email-logs-*` and `eccs-app-logs-*` |
+
+> **Note:** Kibana 8.x renamed "index patterns" to "data views". The saved objects in this directory use the `data-view` type for compatibility with Kibana 8.x+.
 
 ### Dashboards
 
@@ -52,13 +54,13 @@ A comprehensive dashboard for monitoring email delivery performance, including:
 5. Click **Import** to complete
 
 Import order:
-1. `index-patterns.ndjson` (creates index patterns first)
-2. `email-dashboards.ndjson` (creates visualizations and dashboard)
+1. `index-patterns.ndjson` (creates data views first)
+2. `email-dashboards.ndjson` (creates data views, visualizations, and dashboard)
 
 ### Method 2: Kibana API
 
 ```bash
-# Import index patterns
+# Import data views
 curl -X POST "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
   -H "kbn-xsrf: true" \
   --form file=@index-patterns.ndjson
@@ -231,6 +233,6 @@ email_provider:ses AND status:failed
 
 ### Missing Fields
 
-1. Refresh index pattern in Kibana: Stack Management > Index Patterns > Refresh
+1. Refresh data view in Kibana: Stack Management > Data Views > Refresh
 2. Verify Logstash filter processing in pipeline logs
 3. Check field mappings: `curl localhost:9200/eccs-email-logs-*/_mapping`
