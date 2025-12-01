@@ -1077,6 +1077,14 @@ services:
         done
         echo "[SUCCESS] Kibana is ready"
         
+        # Delete existing indices with bad mappings (if any)
+        echo "[INFO] Cleaning up indices with potentially bad mappings..."
+        curl -s -X DELETE "http://elasticsearch:9200/eccs-logs-*" || true
+        curl -s -X DELETE "http://elasticsearch:9200/eccs-email-logs-*" || true
+        curl -s -X DELETE "http://elasticsearch:9200/eccs-app-logs-*" || true
+        echo ""
+        echo "[INFO] Cleanup complete"
+        
         # Create ILM policy
         echo "[INFO] Creating ILM policy..."
         curl -s -X PUT "http://elasticsearch:9200/_ilm/policy/eccs-logs-policy" \
@@ -1116,13 +1124,13 @@ services:
         echo ""
         echo "[SUCCESS] ILM policy created"
         
-        # Create index template
+        # Create index template with comprehensive field mappings
         echo "[INFO] Creating index template..."
         curl -s -X PUT "http://elasticsearch:9200/_index_template/eccs-logs-template" \
           -H "Content-Type: application/json" \
           -d '{
             "index_patterns": ["eccs-logs-*", "eccs-email-logs-*", "eccs-app-logs-*"],
-            "priority": 100,
+            "priority": 200,
             "template": {
               "settings": {
                 "number_of_shards": 1,
@@ -1132,23 +1140,99 @@ services:
               },
               "mappings": {
                 "dynamic": "true",
+                "dynamic_templates": [
+                  {
+                    "strings_as_keywords": {
+                      "match_mapping_type": "string",
+                      "mapping": {
+                        "type": "keyword",
+                        "ignore_above": 1024
+                      }
+                    }
+                  }
+                ],
                 "properties": {
                   "@timestamp": { "type": "date" },
+                  "timestamp": { "type": "date" },
                   "level": { "type": "keyword" },
                   "service": { "type": "keyword" },
-                  "message": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+                  "message": { "type": "text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } },
                   "status": { "type": "keyword" },
                   "emailId": { "type": "keyword" },
                   "userId": { "type": "keyword" },
+                  "version": { "type": "keyword" },
                   "latencyMs": { "type": "long" },
+                  "sendLatencyMs": { "type": "long" },
                   "error_category": { "type": "keyword" },
                   "errorCode": { "type": "keyword" },
-                  "errorMessage": { "type": "text" },
+                  "errorMessage": { "type": "text", "fields": { "keyword": { "type": "keyword", "ignore_above": 512 } } },
+                  "errorStack": { "type": "text" },
                   "is_retry": { "type": "boolean" },
+                  "is_final_failure": { "type": "boolean" },
                   "sentToDlq": { "type": "boolean" },
                   "attempt": { "type": "integer" },
+                  "maxAttempts": { "type": "integer" },
                   "provider": { "type": "keyword" },
-                  "latency_bucket": { "type": "keyword" }
+                  "email_provider": { "type": "keyword" },
+                  "latency_bucket": { "type": "keyword" },
+                  "traceId": { "type": "keyword" },
+                  "spanId": { "type": "keyword" },
+                  "mongodb_id": { "type": "keyword" },
+                  "messageId": { "type": "keyword" },
+                  "recipientEmail": { "type": "keyword" },
+                  "processedAt": { "type": "date" },
+                  "retryScheduledAt": { "type": "date" },
+                  "backoffDelayMs": { "type": "long" },
+                  "pipeline_version": { "type": "keyword" },
+                  "duration_ms": { "type": "long" },
+                  "tags": { "type": "keyword" },
+                  "stats": {
+                    "type": "object",
+                    "properties": {
+                      "sentToday": { "type": "long" },
+                      "totalEmails": { "type": "long" },
+                      "pending": { "type": "long" },
+                      "failed": { "type": "long" }
+                    }
+                  },
+                  "container": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "keyword" },
+                      "id": { "type": "keyword" }
+                    }
+                  },
+                  "host": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "keyword" }
+                    }
+                  },
+                  "error": {
+                    "type": "object",
+                    "properties": {
+                      "message": { "type": "text" },
+                      "type": { "type": "keyword" },
+                      "stack_trace": { "type": "text" }
+                    }
+                  },
+                  "http": {
+                    "type": "object",
+                    "properties": {
+                      "method": { "type": "keyword" },
+                      "status_code": { "type": "integer" },
+                      "url": { "type": "text", "fields": { "keyword": { "type": "keyword" } } }
+                    }
+                  },
+                  "geoip": {
+                    "type": "object",
+                    "properties": {
+                      "city_name": { "type": "keyword" },
+                      "country_name": { "type": "keyword" },
+                      "location": { "type": "geo_point" }
+                    }
+                  },
+                  "metadata": { "type": "object", "enabled": true }
                 }
               }
             }
@@ -1156,7 +1240,7 @@ services:
         echo ""
         echo "[SUCCESS] Index template created"
         
-        # Create initial indices
+        # Create initial indices with proper aliases
         echo "[INFO] Creating initial indices..."
         curl -s -X PUT "http://elasticsearch:9200/eccs-logs-000001" \
           -H "Content-Type: application/json" \

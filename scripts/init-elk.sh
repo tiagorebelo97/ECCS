@@ -9,10 +9,18 @@
 #
 # USAGE:
 #   ./scripts/init-elk.sh
+#   
+#   To clean up and recreate indices with proper mappings:
+#   CLEANUP_INDICES=true ./scripts/init-elk.sh
 #
 # PREREQUISITES:
 #   - Elasticsearch running at http://localhost:9200 (or $ELASTICSEARCH_HOST)
 #   - Kibana running at http://localhost:5601 (or $KIBANA_HOST)
+#
+# ENVIRONMENT VARIABLES:
+#   - ELASTICSEARCH_HOST: Elasticsearch URL (default: http://localhost:9200)
+#   - KIBANA_HOST: Kibana URL (default: http://localhost:5601)
+#   - CLEANUP_INDICES: Set to 'true' to delete existing indices before setup
 #
 # This script is idempotent and safe to run multiple times.
 # ============================================================================
@@ -88,6 +96,17 @@ wait_for_kibana() {
     
     log_error "Kibana did not become ready in time"
     return 1
+}
+
+# Clean up existing indices with bad mappings (optional)
+cleanup_indices() {
+    if [ "$CLEANUP_INDICES" = "true" ]; then
+        log_warn "Cleaning up existing indices with potentially bad mappings..."
+        curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-logs-*" > /dev/null 2>&1 || true
+        curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-email-logs-*" > /dev/null 2>&1 || true
+        curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-app-logs-*" > /dev/null 2>&1 || true
+        log_success "Cleanup complete"
+    fi
 }
 
 # Create ILM policy for log retention
@@ -297,6 +316,9 @@ main() {
     
     echo ""
     log_info "Initializing Elasticsearch..."
+    
+    # Optional cleanup of existing indices
+    cleanup_indices
     
     # Create Elasticsearch resources
     create_ilm_policy

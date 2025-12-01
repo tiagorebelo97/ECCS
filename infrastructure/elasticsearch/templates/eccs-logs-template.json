@@ -26,7 +26,7 @@
   "_comment25": "    - sentToDlq:true (exhausted retries)",
   "_comment26": "============================================================================",
   "index_patterns": ["eccs-logs-*", "eccs-email-logs-*", "eccs-app-logs-*"],
-  "priority": 100,
+  "priority": 200,
   "template": {
     "settings": {
       "number_of_shards": 1,
@@ -37,8 +37,22 @@
     },
     "mappings": {
       "dynamic": "true",
+      "dynamic_templates": [
+        {
+          "strings_as_keywords": {
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        }
+      ],
       "properties": {
         "@timestamp": {
+          "type": "date"
+        },
+        "timestamp": {
           "type": "date"
         },
         "message": {
@@ -212,6 +226,27 @@
           "enabled": true
         },
         "tags": {
+          "type": "keyword"
+        },
+        "stats": {
+          "type": "object",
+          "enabled": true,
+          "properties": {
+            "sentToday": {
+              "type": "long"
+            },
+            "totalEmails": {
+              "type": "long"
+            },
+            "pending": {
+              "type": "long"
+            },
+            "failed": {
+              "type": "long"
+            }
+          }
+        },
+        "version": {
           "type": "keyword"
         }
       }
