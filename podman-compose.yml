@@ -62,6 +62,12 @@
 #   5. Frontend: frontend
 #   6. Gateway: traefik (routes traffic to all services)
 #
+# PODMAN-COMPOSE COMPATIBILITY:
+#   This configuration is optimized for podman-compose. The traefik service
+#   uses simple dependencies (not condition: service_healthy) to avoid 
+#   potential blocking during startup. Traefik's built-in health checking
+#   mechanism in dynamic-config.yml handles service discovery.
+#
 # SECURITY FEATURES:
 #   - All services run as non-root users where supported
 #   - Secrets managed via environment variables (use .env file)
@@ -765,13 +771,21 @@ services:
     # -------------------------------------------------------------------------
     # Service Dependencies
     # -------------------------------------------------------------------------
-    # Traefik waits for backend services to be healthy before starting.
-    # This prevents health check failures during initial startup.
+    # NOTE: Health check conditions removed for better podman-compose compatibility.
+    # podman-compose may not fully support depends_on with condition: service_healthy,
+    # which can cause the compose startup to hang indefinitely.
+    #
+    # Instead of blocking on health checks, Traefik uses its built-in health checking
+    # mechanism defined in dynamic-config.yml to detect when backend services become
+    # available. The retry middleware will handle temporary unavailability.
+    #
+    # Benefits of this approach:
+    # - All services start in parallel for faster overall startup
+    # - Traefik gracefully handles backend unavailability during startup
+    # - Works consistently with both podman-compose and docker-compose
     depends_on:
-      email-service:
-        condition: service_healthy
-      auth-service:
-        condition: service_healthy
+      - email-service
+      - auth-service
     networks:
       - eccs-network
     labels:
