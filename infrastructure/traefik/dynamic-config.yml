@@ -421,9 +421,11 @@ http:
       service: auth-service
       # Auth endpoints use stricter rate limiting
       # No JWT middleware (these endpoints issue tokens)
+      # Retry middleware handles transient 503 errors during service startup
       middlewares:
         - rate-limit-auth
         - security-headers
+        - retry
       entryPoints:
         - web
       priority: 10
@@ -435,6 +437,7 @@ http:
       middlewares:
         - rate-limit-auth
         - security-headers
+        - retry
       entryPoints:
         - websecure
       priority: 10
