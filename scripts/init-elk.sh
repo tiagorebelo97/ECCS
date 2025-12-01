@@ -102,9 +102,27 @@ wait_for_kibana() {
 cleanup_indices() {
     if [ "$CLEANUP_INDICES" = "true" ]; then
         log_warn "Cleaning up existing indices with potentially bad mappings..."
-        curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-logs-*" > /dev/null 2>&1 || true
-        curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-email-logs-*" > /dev/null 2>&1 || true
-        curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-app-logs-*" > /dev/null 2>&1 || true
+        
+        # Check and log which indices will be deleted
+        local eccs_logs=$(curl -s "$ELASTICSEARCH_HOST/_cat/indices/eccs-logs-*?h=index" 2>/dev/null | tr '\n' ' ')
+        local email_logs=$(curl -s "$ELASTICSEARCH_HOST/_cat/indices/eccs-email-logs-*?h=index" 2>/dev/null | tr '\n' ' ')
+        local app_logs=$(curl -s "$ELASTICSEARCH_HOST/_cat/indices/eccs-app-logs-*?h=index" 2>/dev/null | tr '\n' ' ')
+        
+        if [ -n "$eccs_logs" ]; then
+            log_info "Deleting eccs-logs indices: $eccs_logs"
+            curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-logs-*" > /dev/null 2>&1 || true
+        fi
+        
+        if [ -n "$email_logs" ]; then
+            log_info "Deleting eccs-email-logs indices: $email_logs"
+            curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-email-logs-*" > /dev/null 2>&1 || true
+        fi
+        
+        if [ -n "$app_logs" ]; then
+            log_info "Deleting eccs-app-logs indices: $app_logs"
+            curl -s -X DELETE "$ELASTICSEARCH_HOST/eccs-app-logs-*" > /dev/null 2>&1 || true
+        fi
+        
         log_success "Cleanup complete"
     fi
 }

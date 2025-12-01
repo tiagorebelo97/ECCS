@@ -1078,12 +1078,20 @@ services:
         echo "[SUCCESS] Kibana is ready"
         
         # Delete existing indices with bad mappings (if any)
-        echo "[INFO] Cleaning up indices with potentially bad mappings..."
-        curl -s -X DELETE "http://elasticsearch:9200/eccs-logs-*" || true
-        curl -s -X DELETE "http://elasticsearch:9200/eccs-email-logs-*" || true
-        curl -s -X DELETE "http://elasticsearch:9200/eccs-app-logs-*" || true
-        echo ""
-        echo "[INFO] Cleanup complete"
+        # NOTE: This cleanup runs on every elk-init execution to ensure fresh indices
+        # with correct mappings. In production, you may want to make this conditional
+        # by checking an environment variable like CLEANUP_INDICES.
+        # WARNING: This will delete all existing log data in these indices!
+        if [ "${CLEANUP_INDICES:-true}" = "true" ]; then
+          echo "[INFO] Cleaning up indices with potentially bad mappings..."
+          curl -s -X DELETE "http://elasticsearch:9200/eccs-logs-*" || true
+          curl -s -X DELETE "http://elasticsearch:9200/eccs-email-logs-*" || true
+          curl -s -X DELETE "http://elasticsearch:9200/eccs-app-logs-*" || true
+          echo ""
+          echo "[INFO] Cleanup complete"
+        else
+          echo "[INFO] Skipping index cleanup (CLEANUP_INDICES=false)"
+        fi
         
         # Create ILM policy
         echo "[INFO] Creating ILM policy..."
