@@ -46,6 +46,8 @@ pipeline.ordered: auto
 # Where to store Logstash data
 path.data: /usr/share/logstash/data
 # Where to write Logstash logs
+# Note: The /var/log/logstash directory is created in the Dockerfile
+# with proper permissions for the logstash user.
 path.logs: /var/log/logstash
 
 # -----------------------------------------------------------------------------

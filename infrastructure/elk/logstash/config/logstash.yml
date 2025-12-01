@@ -6,4 +6,6 @@ pipeline.batch.size: 125
 pipeline.batch.delay: 50
 
 log.level: info
+# Note: If using this configuration, ensure /var/log/logstash directory
+# exists with proper permissions for the logstash user.
 path.logs: /var/log/logstash
