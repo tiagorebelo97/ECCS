@@ -86,6 +86,11 @@ RUN mkdir -p /var/log/logstash && \
 # Switch back to logstash user
 USER logstash
 
+# Install the MongoDB input plugin for the eccs-mongodb pipeline
+# This plugin is required to read email_logs and application_logs collections
+# from MongoDB and push them to Elasticsearch for Kibana dashboards.
+RUN /usr/share/logstash/bin/logstash-plugin install logstash-input-mongodb
+
 # HEALTHCHECK: Verify Logstash is processing events
 # Checks the Logstash API for pipeline status
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
