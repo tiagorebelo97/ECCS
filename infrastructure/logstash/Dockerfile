@@ -63,6 +63,8 @@ RUN rm -f /usr/share/logstash/pipeline/logstash.conf
 # Copy custom Logstash configuration
 COPY config/logstash.yml /usr/share/logstash/config/logstash.yml
 COPY config/pipelines.yml /usr/share/logstash/config/pipelines.yml
+COPY config/jvm.options /usr/share/logstash/config/jvm.options
+COPY config/log4j2.properties /usr/share/logstash/config/log4j2.properties
 
 # Copy pipeline configurations
 COPY pipeline/ /usr/share/logstash/pipeline/
