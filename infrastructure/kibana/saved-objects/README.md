@@ -8,8 +8,8 @@ This directory contains pre-configured Kibana saved objects for monitoring the E
 
 | File | Description |
 |------|-------------|
-| `index-patterns.ndjson` | General logs data view (`eccs-logs-*`) for real-time log ingestion |
-| `email-dashboards.ndjson` | Contains data views for MongoDB logs: `eccs-email-logs-*` and `eccs-app-logs-*` |
+| `index-patterns.ndjson` | All ECCS data views: `eccs-logs-*` (real-time), `eccs-email-logs-*` (email processing), `eccs-app-logs-*` (application logs) |
+| `email-dashboards.ndjson` | Visualizations and dashboards that reference the data views |
 
 > **Note:** Kibana 8.x renamed "index patterns" to "data views". The saved objects in this directory use the `data-view` type for compatibility with Kibana 8.x+.
 
@@ -54,8 +54,8 @@ A comprehensive dashboard for monitoring email delivery performance, including:
 5. Click **Import** to complete
 
 Import order:
-1. `index-patterns.ndjson` (creates data views first)
-2. `email-dashboards.ndjson` (creates data views, visualizations, and dashboard)
+1. `index-patterns.ndjson` (creates all data views first)
+2. `email-dashboards.ndjson` (creates visualizations and dashboard that reference the data views)
 
 ### Method 2: Kibana API
 
