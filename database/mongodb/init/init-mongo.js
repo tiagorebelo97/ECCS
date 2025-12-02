@@ -49,4 +49,26 @@ db.createCollection('application_logs', {
 db.application_logs.createIndex({ timestamp: -1 });
 db.application_logs.createIndex({ service: 1, level: 1 });
 
+// Insert placeholder documents for Logstash mongodb input plugin
+// The plugin requires at least one document in each collection to initialize
+// its progress tracking. Without these, the plugin crashes with:
+// NoMethodError: undefined method [] for nil:NilClass in init_placeholder
+db.email_logs.insertOne({
+  emailId: 'placeholder-init',
+  status: 'sent',
+  processedAt: new Date(),
+  metadata: {
+    isPlaceholder: true,
+    description: 'Initialization placeholder for Logstash mongodb input plugin'
+  }
+});
+
+db.application_logs.insertOne({
+  timestamp: new Date(),
+  service: 'mongodb-init',
+  level: 'info',
+  message: 'Initialization placeholder for Logstash mongodb input plugin',
+  isPlaceholder: true
+});
+
 print('MongoDB initialization complete!');
