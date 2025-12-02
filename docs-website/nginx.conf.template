@@ -1,0 +1,122 @@
+# ============================================================================
+# ECCS Documentation Website Nginx Configuration (Template)
+# ============================================================================
+# This is a template file that gets processed by nginx's entrypoint script.
+# The $NGINX_LOCAL_RESOLVERS variable is populated from /etc/resolv.conf
+# by the nginx Docker/Podman entrypoint when NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+#
+# FEATURES:
+#   - Static file serving with caching
+#   - SPA routing (all routes serve index.html)
+#   - Gzip compression for performance
+#   - Security headers for protection
+#
+# PODMAN COMPATIBILITY:
+#   - Uses port 3100 (unprivileged for rootless)
+#   - Runs as nginx user (non-root)
+#   - Dynamic DNS resolution using container runtime's nameservers
+# ============================================================================
+
+# DNS resolver for dynamic upstream resolution (required for nginx template processing)
+# $NGINX_LOCAL_RESOLVERS is populated from /etc/resolv.conf by the nginx entrypoint
+# This enables proper DNS resolution in container environments, even if not directly used
+# for proxy_pass in this configuration. It's needed for the template processing system.
+resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+
+server {
+    # -------------------------------------------------------------------------
+    # Server Configuration
+    # -------------------------------------------------------------------------
+    # Listen on port 3100 (unprivileged port for rootless containers)
+    listen 3100;
+    
+    # Server name (for virtual hosting)
+    server_name localhost;
+    
+    # Document root for static files
+    root /usr/share/nginx/html;
+    
+    # Default index file
+    index index.html;
+
+    # -------------------------------------------------------------------------
+    # SPA Routing
+    # -------------------------------------------------------------------------
+    # Serve documentation website
+    # For any route not matching a file, serve index.html
+    # This enables client-side routing (React Router)
+    location / {
+        try_files $uri $uri/ /index.html;
+        
+        # Cache control for static assets
+        # HTML should not be cached to ensure fresh deployments
+        location ~* \.html$ {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header Pragma "no-cache";
+            add_header Expires "0";
+        }
+        
+        # Cache static assets (JS, CSS, images) for 1 year
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+
+    # -------------------------------------------------------------------------
+    # Health Check Endpoint
+    # -------------------------------------------------------------------------
+    # Simple health check for container orchestration
+    location /health {
+        access_log off;
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
+    }
+
+    # -------------------------------------------------------------------------
+    # Compression
+    # -------------------------------------------------------------------------
+    # Enable gzip compression for text-based content
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_min_length 256;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/x-javascript
+        application/xml
+        application/xml+rss
+        application/vnd.ms-fontobject
+        application/x-font-ttf
+        font/opentype
+        image/svg+xml
+        image/x-icon;
+
+    # -------------------------------------------------------------------------
+    # Security Headers
+    # -------------------------------------------------------------------------
+    # Add security headers to all responses
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # -------------------------------------------------------------------------
+    # Error Pages
+    # -------------------------------------------------------------------------
+    # Custom error pages
+    error_page 404 /index.html;
+    error_page 500 502 503 504 /index.html;
+
+    # -------------------------------------------------------------------------
+    # Logging
+    # -------------------------------------------------------------------------
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log warn;
+}

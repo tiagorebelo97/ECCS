@@ -14,31 +14,31 @@
 #   ┌─────────────────────────────────────────────────────────────────────────┐
 #   │                            Traefik (API Gateway)                        │
 #   │                         Port 8800, 8443, 8080                           │
-#   └────────────────┬────────────────┬───────────────────────────────────────┘
-#                    │                │
-#   ┌────────────────▼────┐  ┌────────▼────────────┐
-#   │   Frontend (React)  │  │  Backend Services   │
-#   │      Port 3000      │  │                     │
-#   └─────────────────────┘  │  ┌──────────────┐   │
-#                            │  │ Auth Service │   │
-#                            │  │   Port 3002  │   │
-#                            │  └──────────────┘   │
-#                            │  ┌──────────────┐   │
-#                            │  │Email Service │   │
-#                            │  │   Port 3001  │   │
-#                            │  └──────────────┘   │
-#                            │  ┌──────────────┐   │
-#                            │  │ Notification │   │
-#                            │  │   Service    │   │
-#                            │  └──────────────┘   │
-#                            └────────────────────┘
-#                                      │
-#   ┌──────────────────────────────────┼──────────────────────────────────────┐
-#   │                        Data Layer                                       │
-#   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────────┐  │
-#   │  │  PostgreSQL  │  │   MongoDB    │  │    Kafka + Zookeeper         │  │
-#   │  │  Port 5432   │  │  Port 27017  │  │    Ports 9092, 2181          │  │
-#   │  └──────────────┘  └──────────────┘  └──────────────────────────────┘  │
+#   └───────────┬───────────────────┬───────────────────┬─────────────────────┘
+#               │                   │                   │
+#   ┌───────────▼───────┐  ┌────────▼────────┐  ┌───────▼───────┐
+#   │ Frontend (React)  │  │  Docs Website   │  │    Backend    │
+#   │     Port 3000     │  │    Port 3100    │  │    Services   │
+#   └───────────────────┘  └─────────────────┘  │               │
+#                                               │ ┌───────────┐ │
+#                                               │ │Auth Svc   │ │
+#                                               │ │Port 3002  │ │
+#                                               │ └───────────┘ │
+#                                               │ ┌───────────┐ │
+#                                               │ │Email Svc  │ │
+#                                               │ │Port 3001  │ │
+#                                               │ └───────────┘ │
+#                                               │ ┌───────────┐ │
+#                                               │ │Notify Svc │ │
+#                                               │ └───────────┘ │
+#                                               └───────────────┘
+#                                                       │
+#   ┌───────────────────────────────────────────────────┼─────────────────────┐
+#   │                           Data Layer              │                     │
+#   │  ┌──────────────┐  ┌──────────────┐  ┌────────────┴─────────────────┐   │
+#   │  │  PostgreSQL  │  │   MongoDB    │  │    Kafka + Zookeeper        │   │
+#   │  │  Port 5432   │  │  Port 27017  │  │    Ports 9092, 2181         │   │
+#   │  └──────────────┘  └──────────────┘  └──────────────────────────────┘   │
 #   └─────────────────────────────────────────────────────────────────────────┘
 #                                      │
 #   ┌──────────────────────────────────┼──────────────────────────────────────┐
@@ -59,7 +59,7 @@
 #   2. Email: postfix (SMTP server for email delivery)
 #   3. Observability: logstash, kibana, prometheus, grafana, jaeger
 #   4. Backend: auth-service, email-service, notification-service
-#   5. Frontend: frontend
+#   5. Frontend: frontend, docs-website
 #   6. Gateway: traefik (routes traffic to all services)
 #
 # PODMAN-COMPOSE COMPATIBILITY:
@@ -152,6 +152,52 @@ services:
     #     limits:
     #       cpus: '0.5'
     #       memory: 256M
+
+  # --------------------------------------------------------------------------
+  # Documentation Website - ECCS Documentation
+  # --------------------------------------------------------------------------
+  # The documentation website for the ECCS platform.
+  # Serves static documentation files via Nginx.
+  #
+  # BUILD:
+  #   Multi-stage build: Node.js builds the documentation site, Nginx serves static files
+  #
+  # SECURITY:
+  #   - Runs as nginx user (non-root)
+  #   - Security headers configured in nginx.conf
+  #
+  # DEPENDENCIES:
+  #   - None (standalone documentation service)
+  # --------------------------------------------------------------------------
+  docs-website:
+    build:
+      context: ./docs-website
+      dockerfile: Dockerfile
+    container_name: eccs-docs-website
+    # Port mapping: host:container
+    # Container runs on 3100 (unprivileged for rootless)
+    ports:
+      - "3100:3100"
+    # Network attachment for inter-container communication
+    networks:
+      - eccs-network
+    # Traefik labels for dynamic routing configuration
+    labels:
+      # Enable this container for Traefik routing
+      - "traefik.enable=true"
+      # Route rule: Match requests to docs.localhost
+      - "traefik.http.routers.docs.rule=Host(`docs.localhost`)"
+      # Backend service port
+      - "traefik.http.services.docs.loadbalancer.server.port=3100"
+    # Health check for service readiness
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Restart policy for reliability
+    restart: unless-stopped
 
   # ==========================================================================
   # BACKEND SERVICES
