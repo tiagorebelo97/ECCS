@@ -61,3 +61,6 @@ temp/
 data/
 pgdata/
 mongodata/
+
+# Allow src/data directories for application data files
+!**/src/data/
