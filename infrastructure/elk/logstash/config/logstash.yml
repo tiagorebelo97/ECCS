@@ -1,5 +1,18 @@
 http.host: "0.0.0.0"
-xpack.monitoring.elasticsearch.hosts: [ "http://elasticsearch:9200" ]
+
+# ============================================================================
+# Monitoring Settings
+# ============================================================================
+# Disable internal metrics collection to Elasticsearch to avoid connection errors.
+# In Logstash 8.x, 'xpack.monitoring.enabled' is deprecated and replaced by
+# 'monitoring.enabled'. Only one of these settings should be configured.
+# Metrics are still available via the HTTP API at port 9600.
+monitoring.enabled: false
+
+# Alternative: Enable monitoring to the Elasticsearch container
+# Uncomment these lines if you want to enable monitoring:
+# monitoring.enabled: true
+# monitoring.elasticsearch.hosts: ["http://elasticsearch:9200"]
 
 pipeline.workers: 2
 pipeline.batch.size: 125
