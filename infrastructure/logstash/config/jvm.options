@@ -43,7 +43,10 @@
 -Dfile.encoding=UTF-8
 
 # Temporary directory
--Djava.io.tmpdir=${LS_HOME}/tmp
+# NOTE: Use absolute path instead of ${LS_HOME} variable, which may not be
+# expanded correctly and causes SQLite JDBC native library loading to fail
+# with UnsatisfiedLinkError when path contains literal "${LS_HOME}".
+-Djava.io.tmpdir=/tmp
 
 # Disable JRuby invokedynamic on Java 11+
 -Djruby.compile.invokedynamic=false
@@ -60,10 +63,12 @@
 #-XX:+HeapDumpOnOutOfMemoryError
 
 # Heap dump location
-#-XX:HeapDumpPath=${LS_HOME}/heapdump.hprof
+# NOTE: Use absolute path instead of ${LS_HOME} variable for consistency
+#-XX:HeapDumpPath=/var/log/logstash/heapdump.hprof
 
 # Specify an alternative path for JVM fatal error logs
--XX:ErrorFile=${LS_HOME}/hs_err_pid%p.log
+# NOTE: Use absolute path instead of ${LS_HOME} variable for consistency
+-XX:ErrorFile=/var/log/logstash/hs_err_pid%p.log
 
 # Module access for Java 11+
 --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
