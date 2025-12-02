@@ -67,6 +67,9 @@
         "level": {
           "type": "keyword"
         },
+        "service_name": {
+          "type": "keyword"
+        },
         "service": {
           "type": "keyword"
         },
