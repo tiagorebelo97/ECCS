@@ -1,9 +1,8 @@
 # ============================================================================
-# ECCS Documentation Website Nginx Configuration (Template)
+# ECCS Documentation Website Nginx Configuration
 # ============================================================================
-# This is a template file that gets processed by nginx's entrypoint script.
-# The $NGINX_LOCAL_RESOLVERS variable is populated from /etc/resolv.conf
-# by the nginx Docker/Podman entrypoint when NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+# This configuration serves static documentation files with optimized caching
+# and security headers.
 #
 # FEATURES:
 #   - Static file serving with caching
@@ -14,14 +13,11 @@
 # PODMAN COMPATIBILITY:
 #   - Uses port 3100 (unprivileged for rootless)
 #   - Runs as nginx user (non-root)
-#   - Dynamic DNS resolution using container runtime's nameservers
+#
+# NOTE: Unlike the frontend, this docs-website does not need a resolver
+# directive because it only serves static files and does not proxy
+# requests to upstream services.
 # ============================================================================
-
-# DNS resolver for dynamic upstream resolution (required for nginx template processing)
-# $NGINX_LOCAL_RESOLVERS is populated from /etc/resolv.conf by the nginx entrypoint
-# This enables proper DNS resolution in container environments, even if not directly used
-# for proxy_pass in this configuration. It's needed for the template processing system.
-resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
 
 server {
     # -------------------------------------------------------------------------

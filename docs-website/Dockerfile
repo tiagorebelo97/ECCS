@@ -76,11 +76,9 @@ COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 # Copy custom main nginx.conf for rootless container compatibility
 COPY --chown=nginx:nginx nginx-main.conf /etc/nginx/nginx.conf
 
-# Copy nginx server configuration template
+# Copy nginx server configuration to templates directory
+# The nginx entrypoint will copy this to conf.d/default.conf
 COPY --chown=nginx:nginx nginx.conf.template /etc/nginx/templates/default.conf.template
-
-# Set environment variables for nginx template processing
-ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 
 # HEALTHCHECK: Container health monitoring
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
