@@ -70,9 +70,6 @@
         "service_name": {
           "type": "keyword"
         },
-        "service": {
-          "type": "keyword"
-        },
         "service_type": {
           "type": "keyword"
         },
