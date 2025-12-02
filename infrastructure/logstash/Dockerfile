@@ -86,15 +86,16 @@ RUN mkdir -p /var/log/logstash && \
 # Switch back to logstash user
 USER logstash
 
-# Environment defaults - set BEFORE plugin installation to ensure adequate memory
-# during the build process. The plugin installation process is memory-intensive
-# and will fail with OutOfMemoryError if insufficient heap is allocated.
-ENV LS_JAVA_OPTS="-Xms256m -Xmx256m"
-
 # Install the MongoDB input plugin for the eccs-mongodb pipeline
 # This plugin is required to read email_logs and application_logs collections
 # from MongoDB and push them to Elasticsearch for Kibana dashboards.
-RUN /usr/share/logstash/bin/logstash-plugin install logstash-input-mongodb
+# NOTE: Plugin installation is memory-intensive (JRuby + bundler). We set
+# LS_JAVA_OPTS inline with 1GB heap because ENV values don't apply to RUN
+# commands during build. Without this, the build fails with OutOfMemoryError.
+RUN LS_JAVA_OPTS="-Xms1g -Xmx1g" /usr/share/logstash/bin/logstash-plugin install logstash-input-mongodb
+
+# Environment defaults for runtime - 256MB is sufficient for normal operation
+ENV LS_JAVA_OPTS="-Xms256m -Xmx256m"
 
 # HEALTHCHECK: Verify Logstash is processing events
 # Checks the Logstash API for pipeline status
