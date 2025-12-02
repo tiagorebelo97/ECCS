@@ -86,6 +86,11 @@ RUN mkdir -p /var/log/logstash && \
 # Switch back to logstash user
 USER logstash
 
+# Environment defaults - set BEFORE plugin installation to ensure adequate memory
+# during the build process. The plugin installation process is memory-intensive
+# and will fail with OutOfMemoryError if insufficient heap is allocated.
+ENV LS_JAVA_OPTS="-Xms256m -Xmx256m"
+
 # Install the MongoDB input plugin for the eccs-mongodb pipeline
 # This plugin is required to read email_logs and application_logs collections
 # from MongoDB and push them to Elasticsearch for Kibana dashboards.
@@ -101,6 +106,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
 # 5044: Beats input for Filebeat/Metricbeat
 # 9600: Logstash monitoring API
 EXPOSE 5000 5044 9600
-
-# Environment defaults
-ENV LS_JAVA_OPTS="-Xms256m -Xmx256m"
