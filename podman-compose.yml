@@ -903,7 +903,9 @@ services:
   #     - sentToDlq:true OR tags:dlq
   # --------------------------------------------------------------------------
   logstash:
-    image: docker.elastic.co/logstash/logstash:8.11.0
+    build:
+      context: ./infrastructure/logstash
+      dockerfile: Dockerfile
     container_name: eccs-logstash
     volumes:
       # Pipeline configuration (contains main.conf and mongodb-logs.conf)
@@ -1164,6 +1166,8 @@ services:
                   "timestamp": { "type": "date" },
                   "level": { "type": "keyword" },
                   "service": { "type": "keyword" },
+                  "service_type": { "type": "keyword" },
+                  "service_version": { "type": "keyword" },
                   "message": { "type": "text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } },
                   "status": { "type": "keyword" },
                   "emailId": { "type": "keyword" },

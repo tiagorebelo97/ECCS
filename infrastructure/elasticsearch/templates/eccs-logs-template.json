@@ -70,6 +70,12 @@
         "service": {
           "type": "keyword"
         },
+        "service_type": {
+          "type": "keyword"
+        },
+        "service_version": {
+          "type": "keyword"
+        },
         "traceId": {
           "type": "keyword"
         },
