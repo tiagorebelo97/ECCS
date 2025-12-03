@@ -14,7 +14,7 @@
 # INPUT SOURCES:
 #   - TCP (port 5000): JSON logs from applications
 #   - Beats (port 5044): Filebeat and other Beat agents
-#   - Kafka (optional): For high-volume log streaming
+#   - MongoDB: Email and application logs from MongoDB collections
 #
 # OUTPUT DESTINATIONS:
 #   - Elasticsearch: Primary log storage
@@ -33,6 +33,9 @@
 # ENVIRONMENT VARIABLES:
 #   - LS_JAVA_OPTS: JVM heap size settings
 #   - ELASTICSEARCH_HOSTS: Elasticsearch cluster URL
+#   - MONGODB_URI: MongoDB connection string
+#   - MONGODB_WAIT_TIMEOUT: Seconds to wait for MongoDB (default: 300)
+#   - MONGODB_INIT_WAIT: Seconds to wait after MongoDB is reachable (default: 30)
 # ============================================================================
 
 # Base image: Official Logstash 8.11
@@ -50,10 +53,17 @@ LABEL maintainer="ECCS DevOps Team"
 USER root
 
 # Install additional utilities
+# - curl, jq: HTTP requests and JSON processing
+# - netcat-openbsd: Network connectivity checks for MongoDB
+# - python3, python3-pip: For MongoDB connectivity verification with pymongo
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
-        jq && \
+        jq \
+        netcat-openbsd \
+        python3 \
+        python3-pip && \
+    pip3 install --no-cache-dir pymongo && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -72,6 +82,12 @@ COPY pipeline/ /usr/share/logstash/pipeline/
 # Copy patterns for grok parsing
 COPY patterns/ /usr/share/logstash/patterns/
 
+# Copy custom entrypoint script
+# This script waits for MongoDB to have placeholder documents before starting Logstash
+# to work around a bug in logstash-input-mongodb plugin that crashes on empty collections
+COPY docker-entrypoint.sh /usr/local/bin/eccs-entrypoint.sh
+RUN chmod +x /usr/local/bin/eccs-entrypoint.sh
+
 # Create log directory and ensure proper permissions
 # The /var/log/logstash directory is required for Logstash's rolling file appenders
 # configured in log4j2.properties. Without this, Logstash fails with errors:
@@ -89,6 +105,13 @@ USER logstash
 # Install the MongoDB input plugin for the eccs-mongodb pipeline
 # This plugin is required to read email_logs and application_logs collections
 # from MongoDB and push them to Elasticsearch for Kibana dashboards.
+#
+# KNOWN ISSUE: The plugin (v0.4.1, last updated 2017) has a bug where it crashes
+# with "NoMethodError: undefined method [] for nil:NilClass" when querying an
+# empty MongoDB collection. This is worked around by:
+# 1. MongoDB init script creates placeholder documents in each collection
+# 2. Custom entrypoint waits for MongoDB to have these documents before starting
+#
 # NOTE: Plugin installation is memory-intensive (JRuby + bundler). We set
 # LS_JAVA_OPTS inline with 1GB heap because ENV values don't apply to RUN
 # commands during build. Without this, the build fails with OutOfMemoryError.
@@ -107,3 +130,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
 # 5044: Beats input for Filebeat/Metricbeat
 # 9600: Logstash monitoring API
 EXPOSE 5000 5044 9600
+
+# Use custom entrypoint that waits for MongoDB before starting Logstash
+ENTRYPOINT ["/usr/local/bin/eccs-entrypoint.sh"]
