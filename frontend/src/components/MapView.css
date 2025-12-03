@@ -1,0 +1,252 @@
+/**
+ * ============================================================================
+ * MapView Component Styles
+ * ============================================================================
+ */
+
+/* Import Leaflet CSS */
+@import 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+
+.map-view {
+  padding: 1rem;
+}
+
+.map-container-wrapper {
+  display: flex;
+  gap: 1.5rem;
+  min-height: 600px;
+}
+
+.map-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.leaflet-map {
+  height: 600px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.map-sidebar {
+  width: 350px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+}
+
+.map-sidebar h3 {
+  margin: 0 0 1rem 0;
+  color: var(--color-primary);
+}
+
+.map-sidebar h4 {
+  margin: 1.5rem 0 1rem 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.instructions {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.save-location-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.save-location-form .form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.save-location-form input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.save-location-form input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.coordinates {
+  font-family: monospace;
+  background: var(--color-background);
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.address-text,
+.address-loading {
+  background: var(--color-background);
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin: 0;
+  word-break: break-word;
+}
+
+.address-loading {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.button-group .btn {
+  flex: 1;
+}
+
+.no-selection {
+  color: var(--color-text-secondary);
+  font-style: italic;
+  text-align: center;
+  padding: 2rem 1rem;
+  background: var(--color-background);
+  border-radius: 4px;
+}
+
+.saved-locations-list {
+  margin-top: 1rem;
+}
+
+.saved-locations-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.saved-location-item {
+  padding: 0.75rem;
+  background: var(--color-background);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.saved-location-item strong {
+  color: var(--color-text);
+}
+
+.location-address {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.no-locations {
+  color: var(--color-text-secondary);
+  font-style: italic;
+  text-align: center;
+  padding: 1rem;
+}
+
+.more-locations {
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  padding: 0.5rem;
+}
+
+/* Marker popup styles */
+.marker-popup {
+  min-width: 150px;
+}
+
+.marker-popup strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--color-primary);
+}
+
+.marker-popup p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.marker-popup .address {
+  color: var(--color-text-secondary);
+  word-break: break-word;
+}
+
+.marker-popup .date {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.marker-popup .btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  min-height: auto;
+}
+
+.marker-popup.saved {
+  background: #f8f9fa;
+}
+
+/* Custom marker styles */
+.selected-marker {
+  filter: hue-rotate(120deg);
+}
+
+.saved-marker {
+  filter: hue-rotate(0deg);
+}
+
+/* Responsive design */
+@media (max-width: 900px) {
+  .map-container-wrapper {
+    flex-direction: column;
+  }
+
+  .map-sidebar {
+    width: 100%;
+  }
+
+  .leaflet-map {
+    height: 400px;
+  }
+}
+
+/* Alert styles for map view */
+.map-view .alert {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+}
+
+.map-view .alert-error {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.map-view .alert-success {
+  background: #d1fae5;
+  color: #059669;
+  border: 1px solid #6ee7b7;
+}

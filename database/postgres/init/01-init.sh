@@ -9,12 +9,14 @@
 # DATABASES CREATED:
 # - eccs_email: Email records, templates, and address book
 # - eccs_auth: User accounts and authentication
+# - eccs_locations: Saved map locations
 #
 # TABLES CREATED:
 # - users: User accounts (eccs_auth)
 # - emails: Email records (eccs_email)
 # - email_addresses: Contact book entries (eccs_email)
 # - email_templates: Reusable email templates (eccs_email)
+# - locations: Saved map locations (eccs_locations)
 #
 # INDEXES:
 # All tables include appropriate indexes for query performance.
@@ -33,6 +35,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     -- ========================================================================
     CREATE DATABASE eccs_email;
     CREATE DATABASE eccs_auth;
+    CREATE DATABASE eccs_locations;
     
     -- ========================================================================
     -- GRANT PERMISSIONS
@@ -41,6 +44,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     -- This ensures the user can connect and perform all operations
     GRANT ALL PRIVILEGES ON DATABASE eccs_email TO $POSTGRES_USER;
     GRANT ALL PRIVILEGES ON DATABASE eccs_auth TO $POSTGRES_USER;
+    GRANT ALL PRIVILEGES ON DATABASE eccs_locations TO $POSTGRES_USER;
     
     -- ========================================================================
     -- AUTH DATABASE SCHEMA (eccs_auth)
@@ -155,9 +159,42 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     -- Grant table permissions
     GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $POSTGRES_USER;
     GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $POSTGRES_USER;
+
+    -- ========================================================================
+    -- LOCATIONS DATABASE SCHEMA (eccs_locations)
+    -- ========================================================================
+    \c eccs_locations
+    
+    -- Grant schema permissions
+    GRANT ALL ON SCHEMA public TO $POSTGRES_USER;
+    
+    -- ------------------------------------------------------------------------
+    -- Locations Table
+    -- ------------------------------------------------------------------------
+    -- Stores saved map locations with coordinates and addresses
+    -- Each user can save their own locations
+    CREATE TABLE IF NOT EXISTS locations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        name VARCHAR(255) NOT NULL,            -- custom name for the location
+        address TEXT,                           -- reverse geocoded or user-provided address
+        latitude DECIMAL(10, 8) NOT NULL,       -- latitude coordinate
+        longitude DECIMAL(11, 8) NOT NULL,      -- longitude coordinate
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Indexes for location queries
+    CREATE INDEX idx_locations_user_id ON locations(user_id);
+    CREATE INDEX idx_locations_name ON locations(name);
+    CREATE INDEX idx_locations_created_at ON locations(created_at);
+    
+    -- Grant table permissions
+    GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $POSTGRES_USER;
+    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $POSTGRES_USER;
     
 EOSQL
 
 echo "Database initialization complete!"
-echo "Created databases: eccs_auth, eccs_email"
-echo "Created tables: users, emails, email_addresses, email_templates"
+echo "Created databases: eccs_auth, eccs_email, eccs_locations"
+echo "Created tables: users, emails, email_addresses, email_templates, locations"
