@@ -1,7 +1,13 @@
 const jwt = require('jsonwebtoken');
 const logger = require('../config/logger');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// In production, fail if JWT_SECRET is not provided
+if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
+  logger.error('JWT_SECRET environment variable is required in production');
+  process.exit(1);
+}
 
 const authMiddleware = (req, res, next) => {
   try {
@@ -11,8 +17,9 @@ const authMiddleware = (req, res, next) => {
       return res.status(401).json({ error: 'Authorization token required' });
     }
 
+    const secret = JWT_SECRET || 'your-super-secret-jwt-key';
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, secret);
     
     req.user = {
       id: decoded.userId,

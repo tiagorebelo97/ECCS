@@ -12,6 +12,72 @@ const { body, param, validationResult } = require('express-validator');
 const axios = require('axios');
 const router = express.Router();
 
+// Simple in-memory cache for geocoding results
+const geocodeCache = new Map();
+const CACHE_TTL = 3600000; // 1 hour in milliseconds
+const GEOCODE_RATE_LIMIT_MS = 1000; // Minimum 1 second between requests (Nominatim requires this)
+let lastGeocodeRequest = 0;
+
+/**
+ * Reverse geocode with caching and rate limiting
+ * OpenStreetMap Nominatim requires max 1 request per second
+ */
+async function reverseGeocodeWithRateLimit(lat, lon, logger) {
+  const cacheKey = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+  
+  // Check cache first
+  const cached = geocodeCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.address;
+  }
+  
+  // Rate limiting - wait if needed
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastGeocodeRequest;
+  if (timeSinceLastRequest < GEOCODE_RATE_LIMIT_MS) {
+    await new Promise(resolve => setTimeout(resolve, GEOCODE_RATE_LIMIT_MS - timeSinceLastRequest));
+  }
+  
+  lastGeocodeRequest = Date.now();
+  
+  try {
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+      {
+        headers: {
+          'User-Agent': 'ECCS-Locations-Service/1.0'
+        },
+        timeout: 5000
+      }
+    );
+    
+    const address = response.data.display_name || 'Unknown address';
+    
+    // Cache the result
+    geocodeCache.set(cacheKey, {
+      address,
+      details: response.data.address,
+      timestamp: Date.now()
+    });
+    
+    // Clean old cache entries periodically (keep cache size manageable)
+    if (geocodeCache.size > 1000) {
+      const keysToDelete = [];
+      for (const [key, value] of geocodeCache.entries()) {
+        if (Date.now() - value.timestamp > CACHE_TTL) {
+          keysToDelete.push(key);
+        }
+      }
+      keysToDelete.forEach(key => geocodeCache.delete(key));
+    }
+    
+    return address;
+  } catch (error) {
+    logger.warn('Geocoding failed:', error.message);
+    return 'Address not available';
+  }
+}
+
 /**
  * GET /api/locations
  * Get all locations for the authenticated user
@@ -92,24 +158,10 @@ router.post('/', [
     const userId = req.user.id;
     const { name, latitude, longitude, address } = req.body;
 
-    // If address is not provided, try to reverse geocode
+    // If address is not provided, try to reverse geocode with rate limiting
     let resolvedAddress = address;
     if (!resolvedAddress) {
-      try {
-        const geocodeResponse = await axios.get(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
-          {
-            headers: {
-              'User-Agent': 'ECCS-Locations-Service/1.0'
-            },
-            timeout: 5000
-          }
-        );
-        resolvedAddress = geocodeResponse.data.display_name || 'Unknown address';
-      } catch (geocodeError) {
-        logger.warn('Geocoding failed, using default address:', geocodeError.message);
-        resolvedAddress = 'Address not available';
-      }
+      resolvedAddress = await reverseGeocodeWithRateLimit(latitude, longitude, logger);
     }
 
     // Insert into PostgreSQL
@@ -317,6 +369,7 @@ router.delete('/:id', [
 /**
  * GET /api/locations/reverse-geocode
  * Reverse geocode coordinates to get address
+ * Uses rate limiting and caching to comply with Nominatim usage policy
  */
 router.get('/reverse-geocode/:lat/:lon', [
   param('lat').isFloat({ min: -90, max: 90 }).withMessage('Valid latitude is required'),
@@ -330,6 +383,25 @@ router.get('/reverse-geocode/:lat/:lon', [
   try {
     const { lat, lon } = req.params;
     const logger = req.app.get('logger');
+    const cacheKey = `${parseFloat(lat).toFixed(6)},${parseFloat(lon).toFixed(6)}`;
+    
+    // Check cache first
+    const cached = geocodeCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.json({
+        address: cached.address,
+        details: cached.details || {}
+      });
+    }
+    
+    // Rate limiting - wait if needed
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastGeocodeRequest;
+    if (timeSinceLastRequest < GEOCODE_RATE_LIMIT_MS) {
+      await new Promise(resolve => setTimeout(resolve, GEOCODE_RATE_LIMIT_MS - timeSinceLastRequest));
+    }
+    
+    lastGeocodeRequest = Date.now();
 
     const response = await axios.get(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
@@ -340,6 +412,13 @@ router.get('/reverse-geocode/:lat/:lon', [
         timeout: 5000
       }
     );
+    
+    // Cache the result
+    geocodeCache.set(cacheKey, {
+      address: response.data.display_name,
+      details: response.data.address,
+      timestamp: Date.now()
+    });
 
     res.json({
       address: response.data.display_name,
