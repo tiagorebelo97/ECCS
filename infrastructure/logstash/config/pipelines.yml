@@ -5,9 +5,13 @@
 # Each pipeline can have its own configuration and resources.
 #
 # PIPELINE ARCHITECTURE:
-#   This configuration runs multiple pipelines in parallel:
+#   Currently active pipeline:
 #   1. eccs-main: Real-time log ingestion from TCP/Beats inputs
-#   2. eccs-mongodb: Batch processing of MongoDB backend logs
+#
+#   Disabled pipeline (see comments below for re-enabling):
+#   2. eccs-mongodb: Batch processing of MongoDB backend logs (DISABLED)
+#      - Disabled to resolve Kibana integration errors
+#      - MongoDB input plugin requires specific MongoDB setup
 #
 # RESOURCE ALLOCATION:
 #   - pipeline.workers: Number of filter/output workers per pipeline
@@ -36,8 +40,20 @@
   pipeline.batch.size: 125
 
 # -----------------------------------------------------------------------------
-# MongoDB Pipeline - Backend Logs to Elasticsearch
+# MongoDB Pipeline - Backend Logs to Elasticsearch (DISABLED)
 # -----------------------------------------------------------------------------
+# NOTE: This pipeline has been disabled to resolve Kibana "Application Not Found"
+# errors when clicking on integrations. The MongoDB input plugin requires 
+# specific MongoDB collections to exist and proper connectivity, which can
+# cause issues if MongoDB is not properly configured or the collections don't
+# exist yet.
+#
+# To re-enable this pipeline:
+# 1. Ensure MongoDB is running and accessible
+# 2. Verify the email_logs and application_logs collections exist
+# 3. Uncomment the pipeline configuration below
+#
+# Original configuration:
 # Reads email processing logs from MongoDB and pushes to Elasticsearch
 # for Kibana dashboard visualization.
 #
@@ -70,7 +86,7 @@
 #     - attempt:[2 TO *] (multiple attempts)
 #     - tags:dlq (dead letter queue)
 # -----------------------------------------------------------------------------
-- pipeline.id: eccs-mongodb
-  path.config: "/usr/share/logstash/pipeline/mongodb-logs.conf"
-  pipeline.workers: 1
-  pipeline.batch.size: 250
+# - pipeline.id: eccs-mongodb
+#   path.config: "/usr/share/logstash/pipeline/mongodb-logs.conf"
+#   pipeline.workers: 1
+#   pipeline.batch.size: 250

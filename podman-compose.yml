@@ -919,34 +919,28 @@ services:
   # Central aggregation point for all application logs.
   #
   # PIPELINES:
-  #   1. eccs-main: Real-time log ingestion
+  #   1. eccs-main: Real-time log ingestion (ACTIVE)
   #      - TCP port 5000: JSON logs from applications
   #      - Beats port 5044: Filebeat/Metricbeat forwarded logs
   #      - Output: eccs-logs-YYYY.MM.dd indices
   #
-  #   2. eccs-mongodb: Backend logs from MongoDB
-  #      - Input: email_logs and application_logs collections
-  #      - Output: eccs-email-logs-YYYY.MM.dd and eccs-app-logs-YYYY.MM.dd
-  #      - Purpose: Enable Kibana dashboards for error rates, latencies, retries
+  #   2. eccs-mongodb: Backend logs from MongoDB (DISABLED)
+  #      - Disabled to resolve Kibana "Application Not Found" integration errors
+  #      - See pipelines.yml for instructions to re-enable
   #
   # PROCESSING:
   #   - JSON parsing
   #   - Timestamp normalization
   #   - GeoIP enrichment
   #   - Service tagging
-  #   - Error categorization (for MongoDB logs)
-  #   - Latency bucket calculation
   #
-  # KIBANA DASHBOARD QUERIES:
+  # KIBANA QUERIES (for eccs-logs-* index):
   #   Error Analysis:
-  #     - status:failed OR status:retry
-  #     - error_category:network OR error_category:auth
-  #   Latency Analysis:
-  #     - latency_bucket:slow OR latency_bucket:critical
-  #     - latencyMs:[5000 TO *]
-  #   Retry Analysis:
-  #     - is_retry:true
-  #     - sentToDlq:true OR tags:dlq
+  #     - level:error
+  #     - tags:error
+  #   Service Filtering:
+  #     - service_name:email-service
+  #     - service_name:auth-service
   # --------------------------------------------------------------------------
   logstash:
     build:
@@ -954,7 +948,7 @@ services:
       dockerfile: Dockerfile
     container_name: eccs-logstash
     volumes:
-      # Pipeline configuration (contains main.conf and mongodb-logs.conf)
+      # Pipeline configuration (contains main.conf; mongodb-logs.conf is disabled)
       - ./infrastructure/logstash/pipeline:/usr/share/logstash/pipeline:ro
       # Logstash settings (logstash.yml and pipelines.yml)
       - ./infrastructure/logstash/config:/usr/share/logstash/config:ro
@@ -968,9 +962,10 @@ services:
       - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
       # Elasticsearch output URL
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      # MongoDB connection for mongodb-logs pipeline
-      # Used to read email_logs and application_logs collections
-      - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
+      # MongoDB connection for mongodb-logs pipeline (DISABLED)
+      # NOTE: The MongoDB pipeline has been disabled to resolve Kibana integration errors.
+      # The MONGODB_URI is kept for reference but is not currently used.
+      # - MONGODB_URI=mongodb://mongodb:27017/eccs_logs
       # -----------------------------------------------------------------------
       # Proxy Bypass Configuration
       # -----------------------------------------------------------------------
@@ -980,10 +975,10 @@ services:
       # -----------------------------------------------------------------------
       - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
       - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+    # NOTE: MongoDB dependency removed since MongoDB pipeline is disabled.
+    # This allows Logstash to start without waiting for MongoDB to be healthy.
     depends_on:
       elasticsearch:
-        condition: service_healthy
-      mongodb:
         condition: service_healthy
     networks:
       - eccs-network

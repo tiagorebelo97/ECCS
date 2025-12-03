@@ -263,10 +263,11 @@ export const services = {
     type: 'observability',
     features: ['Log Aggregation', 'JSON Parsing', 'GeoIP Enrichment', 'Service Tagging'],
     endpoints: [],
-    dependencies: ['elasticsearch', 'mongodb'],
+    dependencies: ['elasticsearch'],
     details: {
       container: 'eccs-logstash',
-      pipelines: ['eccs-main', 'eccs-mongodb'],
+      pipelines: ['eccs-main'],
+      disabledPipelines: ['eccs-mongodb'],
       network: 'eccs-network'
     },
     metrics: true
