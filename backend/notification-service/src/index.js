@@ -56,7 +56,7 @@ const { initTracer } = require('./config/tracer');
 // EXPRESS APPLICATION SETUP
 // ============================================================================
 const app = express();
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3004;
 
 // Initialize distributed tracing for request correlation across services
 const tracer = initTracer('notification-service');

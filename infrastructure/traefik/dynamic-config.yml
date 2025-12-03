@@ -318,6 +318,18 @@ http:
           - url: "http://auth-service:3002"
         passHostHeader: true
 
+    # Locations service backend
+    # ROUTING: Handles /api/locations/* requests
+    locations-service:
+      loadBalancer:
+        healthCheck:
+          path: "/health"
+          interval: "10s"
+          timeout: "5s"
+        servers:
+          - url: "http://locations-service:3003"
+        passHostHeader: true
+
     # Frontend service
     # ROUTING: Handles frontend requests to frontend.localhost
     frontend:
@@ -437,6 +449,38 @@ http:
       middlewares:
         - rate-limit-auth
         - security-headers
+        - retry
+      entryPoints:
+        - websecure
+      priority: 10
+      tls:
+        options: default
+
+    # -------------------------------------------------------------------------
+    # Locations API Router (Protected by JWT)
+    # -------------------------------------------------------------------------
+    # ROUTING: /api/locations/* -> locations-service:3003
+    # SECURITY: Requires valid JWT token for access
+    locations-router:
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/locations`)"
+      service: locations-service
+      middlewares:
+        - rate-limit
+        - security-headers
+        - jwt-auth
+        - retry
+      entryPoints:
+        - web
+      priority: 10
+
+    # HTTPS Locations Router (when TLS is enabled)
+    locations-router-secure:
+      rule: "Host(`api.localhost`) && PathPrefix(`/api/locations`)"
+      service: locations-service
+      middlewares:
+        - rate-limit
+        - security-headers
+        - jwt-auth
         - retry
       entryPoints:
         - websecure

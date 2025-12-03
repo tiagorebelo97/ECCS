@@ -1362,9 +1362,18 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
+          "expr": "up{job=\"locations-service\"}",
+          "legendFormat": "Locations Service",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "up{job=\"traefik\"}",
           "legendFormat": "Traefik",
-          "refId": "D"
+          "refId": "E"
         },
         {
           "datasource": {
@@ -1373,7 +1382,7 @@
           },
           "expr": "up{job=\"kafka-exporter\"}",
           "legendFormat": "Kafka Exporter",
-          "refId": "E"
+          "refId": "F"
         }
       ],
       "title": "Service Status",

@@ -453,6 +453,80 @@ services:
           memory: 512M
     restart: unless-stopped
 
+  # --------------------------------------------------------------------------
+  # Locations Service - Map Location Management
+  # --------------------------------------------------------------------------
+  # Handles saving and managing map locations with coordinates and addresses.
+  # Integrates with Elasticsearch for map visualization in Kibana.
+  #
+  # API ENDPOINTS:
+  #   GET  /api/locations - List user's saved locations
+  #   POST /api/locations - Save a new location
+  #   GET  /api/locations/:id - Get specific location
+  #   PUT  /api/locations/:id - Update a location
+  #   DELETE /api/locations/:id - Delete a location
+  #   GET  /api/locations/reverse-geocode/:lat/:lon - Get address from coordinates
+  #
+  # FEATURES:
+  #   - Reverse geocoding via OpenStreetMap Nominatim
+  #   - Elasticsearch indexing for geo_point map visualization
+  #   - PostgreSQL storage for persistence
+  #
+  # SECURITY:
+  #   - Runs as node user (UID 1000)
+  #   - JWT authentication required (via Traefik)
+  #   - Database credentials via environment
+  #
+  # DEPENDENCIES:
+  #   - PostgreSQL: Location data storage
+  #   - Elasticsearch: Geo-point indexing for map visualization
+  # --------------------------------------------------------------------------
+  locations-service:
+    build:
+      context: ./backend/locations-service
+      dockerfile: Dockerfile
+    container_name: eccs-locations-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      # PostgreSQL connection settings
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=eccs_locations
+      - POSTGRES_USER=eccs_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-eccs_secure_password}
+      # Elasticsearch connection for geo-point indexing
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      # JWT secret for token verification (must match auth-service)
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      # Jaeger tracing configuration
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      # Logstash connection for centralized logging (ELK stack)
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - eccs-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.locations.rule=Host(`api.localhost`) && PathPrefix(`/api/locations`)"
+      - "traefik.http.services.locations.loadbalancer.server.port=3003"
+      - "traefik.http.routers.locations.middlewares=jwt-auth@file"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
   # ==========================================================================
   # DATA LAYER - DATABASES
   # ==========================================================================
@@ -460,12 +534,13 @@ services:
   # --------------------------------------------------------------------------
   # PostgreSQL - Primary Relational Database
   # --------------------------------------------------------------------------
-  # Stores structured data for users and emails.
+  # Stores structured data for users, emails, and locations.
   # Uses Alpine image for smaller footprint.
   #
   # DATABASES:
   #   - eccs_auth: User accounts and sessions
   #   - eccs_email: Email records and templates
+  #   - eccs_locations: Saved map locations
   #
   # SECURITY:
   #   - Password authentication required
@@ -487,7 +562,7 @@ services:
       # Default database name (used by init script to connect)
       - POSTGRES_DB=eccs_user
       # Multiple databases to create (handled by init script)
-      - POSTGRES_MULTIPLE_DATABASES=eccs_email,eccs_auth
+      - POSTGRES_MULTIPLE_DATABASES=eccs_email,eccs_auth,eccs_locations
     # Volume mounts for data persistence and initialization
     volumes:
       # Named volume for database files (survives container recreation)
@@ -797,8 +872,8 @@ services:
     environment:
       # Bypass proxy for internal container service names
       # This ensures health checks and ForwardAuth requests go directly to containers
-      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
-      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,locations-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,locations-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     ports:
       # HTTP - Main web traffic (port 8800 to avoid conflicts with commonly used port 8000)
       - "8800:8800"
@@ -1415,7 +1490,8 @@ services:
   # SCRAPE TARGETS:
   #   - email-service:3001/metrics
   #   - auth-service:3002/metrics
-  #   - notification-service:3003/metrics
+  #   - locations-service:3003/metrics
+  #   - notification-service:3004/metrics
   #   - traefik:8080/metrics
   # --------------------------------------------------------------------------
   prometheus:

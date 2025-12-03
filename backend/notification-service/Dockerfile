@@ -82,11 +82,11 @@ COPY --chown=node:node . .
 # The notification service should expose a /health endpoint
 # that reports Kafka consumer connection status
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3003/health || exit 1
+    CMD curl -f http://localhost:3004/health || exit 1
 
 # Note: This service doesn't expose an HTTP port by default
-# It's a Kafka consumer, but we may expose metrics/health on 3003
-EXPOSE 3003
+# It's a Kafka consumer, but we may expose metrics/health on 3004
+EXPOSE 3004
 
 # Switch to non-root user
 USER node

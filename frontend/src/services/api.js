@@ -454,4 +454,98 @@ export const templateApi = {
   },
 };
 
+/**
+ * ============================================================================
+ * LOCATIONS API ENDPOINTS
+ * ============================================================================
+ * 
+ * These endpoints communicate with the Locations Service through Traefik.
+ * All location routes require JWT authentication (enforced by Traefik middleware)
+ * 
+ * FEATURES:
+ * - Save map locations with custom names
+ * - Reverse geocoding to get addresses from coordinates
+ * - Locations are indexed in Elasticsearch for Kibana map visualization
+ */
+export const locationsApi = {
+  /**
+   * GET LOCATIONS
+   * 
+   * Retrieves all saved locations for the authenticated user.
+   * 
+   * @returns {Promise<Array<Location>>}
+   */
+  getLocations: async () => {
+    const response = await apiClient.get('/api/locations');
+    return response.data;
+  },
+
+  /**
+   * GET SINGLE LOCATION
+   * 
+   * @param {number} id - Location ID
+   * @returns {Promise<Location>}
+   */
+  getLocation: async (id) => {
+    const response = await apiClient.get(`/api/locations/${id}`);
+    return response.data;
+  },
+
+  /**
+   * SAVE LOCATION
+   * 
+   * Saves a new location with coordinates, name, and address.
+   * The location is stored in PostgreSQL and indexed in Elasticsearch
+   * for map visualization in Kibana.
+   * 
+   * @param {object} locationData
+   * @param {string} locationData.name - Custom name for the location
+   * @param {number} locationData.latitude - Latitude coordinate
+   * @param {number} locationData.longitude - Longitude coordinate
+   * @param {string} locationData.address - Optional address (auto-geocoded if not provided)
+   * @returns {Promise<{message: string, location: Location}>}
+   */
+  saveLocation: async (locationData) => {
+    const response = await apiClient.post('/api/locations', locationData);
+    return response.data;
+  },
+
+  /**
+   * UPDATE LOCATION
+   * 
+   * @param {number} id - Location ID
+   * @param {object} updates - Fields to update (name, address)
+   * @returns {Promise<{message: string, location: Location}>}
+   */
+  updateLocation: async (id, updates) => {
+    const response = await apiClient.put(`/api/locations/${id}`, updates);
+    return response.data;
+  },
+
+  /**
+   * DELETE LOCATION
+   * 
+   * @param {number} id - Location ID
+   * @returns {Promise<{message: string}>}
+   */
+  deleteLocation: async (id) => {
+    const response = await apiClient.delete(`/api/locations/${id}`);
+    return response.data;
+  },
+
+  /**
+   * REVERSE GEOCODE
+   * 
+   * Converts coordinates to a human-readable address using OpenStreetMap Nominatim.
+   * 
+   * @param {number} lat - Latitude
+   * @param {number} lon - Longitude
+   * @returns {Promise<{address: string, details: object}>}
+   */
+  reverseGeocode: async (lat, lon) => {
+    const response = await apiClient.get(`/api/locations/reverse-geocode/${lat}/${lon}`);
+    return response.data;
+  },
+};
+
 export default apiClient;

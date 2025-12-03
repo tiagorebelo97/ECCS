@@ -55,8 +55,8 @@
 
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
-import { authApi } from './services/api';
-import { EmailListView, TemplateEditor, SendEmailButton } from './components';
+import { authApi, locationsApi } from './services/api';
+import { EmailListView, TemplateEditor, SendEmailButton, MapView } from './components';
 
 /**
  * ============================================================================
@@ -254,6 +254,7 @@ const Navbar = () => {
             <Link to="/compose">Compose</Link>
             <Link to="/emails">Emails</Link>
             <Link to="/templates">Templates</Link>
+            <Link to="/map">Map</Link>
             <button 
               className="btn btn-secondary" 
               onClick={logout}
@@ -892,6 +893,27 @@ const TemplatesPage = () => {
 };
 
 /**
+ * MapPage Component
+ * 
+ * INTEGRATION OF MapView COMPONENT:
+ * Provides an interactive world map for saving locations.
+ * 
+ * FEATURES:
+ * - Click on map to get address from coordinates
+ * - Save locations with custom names
+ * - View and manage saved locations
+ * - Locations indexed in Elasticsearch for Kibana map view
+ */
+const MapPage = () => {
+  return (
+    <main className="container" aria-labelledby="map-title">
+      <h2 id="map-title">World Map - Save Locations</h2>
+      <MapView locationsApi={locationsApi} />
+    </main>
+  );
+};
+
+/**
  * ============================================================================
  * MAIN APP COMPONENT
  * ============================================================================
@@ -909,6 +931,7 @@ const TemplatesPage = () => {
  *   /compose    → Protected, Email composition with SendEmailButton
  *   /emails     → Protected, Email history with EmailListView
  *   /templates  → Protected, Template management with TemplateEditor
+ *   /map        → Protected, Interactive map for saving locations
  * 
  */
 function App() {
@@ -951,6 +974,12 @@ function App() {
               <Route path="/templates" element={
                 <ProtectedRoute>
                   <TemplatesPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/map" element={
+                <ProtectedRoute>
+                  <MapPage />
                 </ProtectedRoute>
               } />
             </Routes>

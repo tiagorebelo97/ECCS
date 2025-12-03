@@ -48,8 +48,14 @@ A fully containerized microservices email system built with modern cloud-native 
 ### Core Services
 - **React Frontend** - Modern, responsive UI for email management
 - **Node.js Backend Services** - Microservices architecture with Express.js
-- **PostgreSQL Database** - Primary data storage for users and emails
+- **PostgreSQL Database** - Primary data storage for users, emails, and locations
 - **MongoDB** - Logging and audit trail storage
+
+### Location Management
+- **Interactive World Map** - Click to save locations with Leaflet
+- **Reverse Geocoding** - Automatic address lookup from coordinates
+- **Elasticsearch Integration** - Geo-point indexing for Kibana map visualization
+- **Rate-Limited API** - Compliant with OpenStreetMap Nominatim usage policy
 
 ### Messaging & Integration
 - **Apache Kafka** - Message queue for async email processing
@@ -129,7 +135,8 @@ ECCS/
 ├── backend/
 │   ├── email-service/          # Email management API
 │   ├── auth-service/           # Authentication service
-│   └── notification-service/   # Kafka consumer for email sending
+│   ├── notification-service/   # Kafka consumer for email sending
+│   └── locations-service/      # Location management API
 ├── database/
 │   ├── postgres/               # PostgreSQL initialization
 │   └── mongodb/                # MongoDB initialization
@@ -168,7 +175,24 @@ Manages user authentication and JWT tokens.
 - `GET /api/auth/verify` - Verify JWT token
 - `POST /api/auth/refresh` - Refresh JWT token
 
-### Notification Service
+### Locations Service (Port 3003)
+Handles map location management with reverse geocoding.
+
+**Endpoints:**
+- `GET /api/locations` - List user's saved locations
+- `POST /api/locations` - Save a new location
+- `GET /api/locations/:id` - Get specific location
+- `PUT /api/locations/:id` - Update a location
+- `DELETE /api/locations/:id` - Delete a location
+- `GET /api/locations/reverse-geocode/:lat/:lon` - Get address from coordinates
+
+**Features:**
+- Interactive world map with Leaflet
+- Reverse geocoding via OpenStreetMap Nominatim
+- Rate limiting and caching for geocoding API
+- Elasticsearch indexing for Kibana map visualization
+
+### Notification Service (Port 3004)
 Kafka consumer that processes emails with retry logic.
 
 **Features:**
