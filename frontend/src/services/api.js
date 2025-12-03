@@ -130,7 +130,10 @@ apiClient.interceptors.request.use(
  * 4. On 429 (Rate Limited):
  *    a. Wait for retry-after duration
  *    b. Retry the request
- * 5. On success, return response data
+ * 5. On 503 (Service Unavailable):
+ *    a. Retry with exponential backoff (1s, 2s, 4s)
+ *    b. After 3 retries, return user-friendly error message
+ * 6. On success, return response data
  * 
  * UI FEEDBACK FLOW:
  * - Components receive either data or formatted error objects
@@ -183,6 +186,26 @@ apiClient.interceptors.response.use(
         code: 'RATE_LIMITED',
         status: 429,
         retryAfter: parseInt(retryAfter),
+      });
+    }
+
+    // Handle 503 Service Unavailable - retry with exponential backoff
+    if (error.response?.status === 503) {
+      const retryCount = originalRequest._retry503 || 0;
+      
+      // Retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        originalRequest._retry503 = retryCount + 1;
+        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return apiClient(originalRequest);
+      }
+      
+      // All retries failed
+      return Promise.reject({
+        message: 'Service temporarily unavailable. Please try again in a few moments.',
+        code: 'SERVICE_UNAVAILABLE',
+        status: 503,
       });
     }
 
