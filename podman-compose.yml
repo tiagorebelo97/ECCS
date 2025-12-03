@@ -872,8 +872,8 @@ services:
     environment:
       # Bypass proxy for internal container service names
       # This ensures health checks and ForwardAuth requests go directly to containers
-      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
-      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - no_proxy=localhost,127.0.0.1,::1,auth-service,email-service,locations-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - NO_PROXY=localhost,127.0.0.1,::1,auth-service,email-service,locations-service,frontend,postgres,mongodb,kafka,zookeeper,elasticsearch,logstash,kibana,grafana,prometheus,jaeger,alertmanager,postfix,kafka-exporter,notification-service,traefik,.localhost,.local,.internal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     ports:
       # HTTP - Main web traffic (port 8800 to avoid conflicts with commonly used port 8000)
       - "8800:8800"

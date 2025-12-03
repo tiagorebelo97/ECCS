@@ -302,21 +302,21 @@ export const services = {
 
   kibana: {
     name: 'Kibana',
-    description: 'Web interface for exploring and visualizing Elasticsearch data. Pre-configured with ECCS dashboards.',
+    description: 'Web interface for exploring and visualizing Elasticsearch data. Pre-configured with ECCS dashboards including map visualization for saved locations.',
     port: 5601,
     technology: 'Kibana 8.11',
     icon: '📊',
     color: '#E53E3E',
     category: 'Observability',
     type: 'observability',
-    features: ['Log Search', 'Dashboards', 'Visualizations', 'Alerting'],
+    features: ['Log Search', 'Dashboards', 'Visualizations', 'Alerting', 'Kibana Maps'],
     endpoints: [
       { method: 'GET', path: '/api/status', description: 'Kibana status' }
     ],
     dependencies: ['elasticsearch'],
     details: {
       container: 'eccs-kibana',
-      dashboards: ['[ECCS] Email Processing Dashboard'],
+      dashboards: ['[ECCS] Email Processing Dashboard', '[ECCS] Saved Locations Map Dashboard'],
       network: 'eccs-network'
     },
     metrics: false
