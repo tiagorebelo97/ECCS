@@ -13,6 +13,7 @@
  * - PostgreSQL for data persistence
  * - Elasticsearch for geo-point indexing and map visualization
  * - JWT-based authentication
+ * - Jaeger for distributed tracing
  */
 
 require('dotenv').config();
@@ -24,6 +25,7 @@ const { Pool } = require('pg');
 const { Client } = require('@elastic/elasticsearch');
 const promClient = require('prom-client');
 const logger = require('./config/logger');
+const { initTracer } = require('./config/tracer');
 const locationRoutes = require('./routes/locations');
 const { authMiddleware } = require('./middleware/auth');
 
@@ -33,6 +35,9 @@ const { authMiddleware } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
+
+// Initialize distributed tracing for request correlation
+const tracer = initTracer('locations-service');
 
 // ============================================================================
 // PROMETHEUS METRICS CONFIGURATION
@@ -123,6 +128,7 @@ if (process.env.ELASTICSEARCH_HOST) {
 app.set('db', pool);
 app.set('elasticsearch', esClient);
 app.set('logger', logger);
+app.set('tracer', tracer);
 
 // ============================================================================
 // API ROUTES

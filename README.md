@@ -192,7 +192,7 @@ Handles map location management with reverse geocoding.
 - Rate limiting and caching for geocoding API
 - Elasticsearch indexing for Kibana map visualization
 
-### Notification Service
+### Notification Service (Port 3004)
 Kafka consumer that processes emails with retry logic.
 
 **Features:**

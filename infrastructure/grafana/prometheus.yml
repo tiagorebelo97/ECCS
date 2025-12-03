@@ -105,9 +105,24 @@ scrape_configs:
   #   - Default Node.js metrics
   - job_name: 'notification-service'
     static_configs:
-      - targets: ['notification-service:3003']
+      - targets: ['notification-service:3004']
         labels:
           service: 'notification-service'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # --------------------------------------------------------------------------
+  # Locations Service - Map Location Management API
+  # --------------------------------------------------------------------------
+  # Exposes:
+  #   - http_request_duration_seconds (histogram)
+  #   - Default Node.js metrics (memory, CPU, event loop)
+  - job_name: 'locations-service'
+    static_configs:
+      - targets: ['locations-service:3003']
+        labels:
+          service: 'locations-service'
           tier: 'backend'
     metrics_path: '/metrics'
     scrape_interval: 15s

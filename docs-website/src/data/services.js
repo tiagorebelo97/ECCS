@@ -100,7 +100,7 @@ export const services = {
   notificationService: {
     name: 'Notification Service',
     description: 'Consumes email events from Kafka and handles actual email delivery. Implements retry logic with exponential backoff.',
-    port: null,
+    port: 3004,
     technology: 'Node.js + Kafka',
     icon: '🔔',
     color: '#FC8181',
@@ -113,6 +113,33 @@ export const services = {
       container: 'eccs-notification-service',
       replicas: 2,
       kafkaTopics: ['email_requests', 'email_requests_retry', 'email_dlq'],
+      network: 'eccs-network'
+    },
+    metrics: true
+  },
+
+  locationsService: {
+    name: 'Locations Service',
+    description: 'Handles map location management with reverse geocoding. Stores locations in PostgreSQL and indexes them in Elasticsearch for map visualization.',
+    port: 3003,
+    technology: 'Node.js + Express',
+    icon: '📍',
+    color: '#38A169',
+    category: 'Backend',
+    type: 'backend',
+    features: ['Reverse Geocoding', 'Geo-Point Indexing', 'JWT Auth', 'Elasticsearch Maps'],
+    endpoints: [
+      { method: 'GET', path: '/api/locations', description: "List user's saved locations" },
+      { method: 'POST', path: '/api/locations', description: 'Save a new location' },
+      { method: 'GET', path: '/api/locations/:id', description: 'Get specific location' },
+      { method: 'PUT', path: '/api/locations/:id', description: 'Update a location' },
+      { method: 'DELETE', path: '/api/locations/:id', description: 'Delete a location' },
+      { method: 'GET', path: '/api/locations/reverse-geocode/:lat/:lon', description: 'Get address from coordinates' },
+      { method: 'GET', path: '/health', description: 'Health check endpoint' }
+    ],
+    dependencies: ['postgres', 'elasticsearch'],
+    details: {
+      container: 'eccs-locations-service',
       network: 'eccs-network'
     },
     metrics: true
@@ -230,14 +257,14 @@ export const services = {
   // Observability - ELK Stack
   elasticsearch: {
     name: 'Elasticsearch',
-    description: 'Stores and indexes log data from all services. Provides full-text search and aggregation capabilities.',
+    description: 'Stores and indexes log data from all services. Provides full-text search, geo-point queries for location visualization, and aggregation capabilities.',
     port: 9200,
     technology: 'Elasticsearch 8.11',
     icon: '🔍',
     color: '#FBD38D',
     category: 'Observability',
     type: 'observability',
-    features: ['Log Indexing', 'Full-Text Search', 'Aggregations', 'ILM Policies'],
+    features: ['Log Indexing', 'Full-Text Search', 'Geo-Point Queries', 'Aggregations', 'ILM Policies'],
     endpoints: [
       { method: 'GET', path: '/_cluster/health', description: 'Cluster health status' },
       { method: 'GET', path: '/_search', description: 'Search logs' }
@@ -245,7 +272,7 @@ export const services = {
     dependencies: [],
     details: {
       container: 'eccs-elasticsearch',
-      indices: ['eccs-logs-*', 'eccs-email-logs-*', 'eccs-app-logs-*'],
+      indices: ['eccs-logs-*', 'eccs-email-logs-*', 'eccs-app-logs-*', 'eccs-locations'],
       volume: 'elasticsearch_data',
       network: 'eccs-network'
     },
@@ -514,6 +541,21 @@ export const flowExamples = [
       { service: 'notificationService', icon: '🔔', action: 'Add span for notification' },
       { service: 'jaeger', icon: '🔬', action: 'Collect and visualize traces' }
     ]
+  },
+  {
+    id: 'save-location',
+    title: 'Save Location Flow',
+    description: 'Complete flow for saving a map location with geocoding',
+    steps: [
+      { service: 'frontend', icon: '🗺️', action: 'User clicks on map to select location' },
+      { service: 'traefik', icon: '🚀', action: 'Validate JWT and route request' },
+      { service: 'locationsService', icon: '📍', action: 'Receive coordinates and validate' },
+      { service: 'locationsService', icon: '📍', action: 'Reverse geocode via Nominatim API' },
+      { service: 'postgres', icon: '🐘', action: 'Store location with address' },
+      { service: 'elasticsearch', icon: '🔍', action: 'Index location as geo_point' },
+      { service: 'kibana', icon: '📊', action: 'Visualize on Kibana Maps' },
+      { service: 'logstash', icon: '📝', action: 'Log location save event' }
+    ]
   }
 ]
 
@@ -526,6 +568,8 @@ export const portSummary = [
   { service: 'Traefik Dashboard', port: '8080', protocol: 'HTTP', access: 'Internal' },
   { service: 'Auth Service', port: '3002', protocol: 'HTTP', access: 'Internal' },
   { service: 'Email Service', port: '3001', protocol: 'HTTP', access: 'Internal' },
+  { service: 'Locations Service', port: '3003', protocol: 'HTTP', access: 'Internal' },
+  { service: 'Notification Service', port: '3004', protocol: 'HTTP', access: 'Internal' },
   { service: 'PostgreSQL', port: '5432', protocol: 'TCP', access: 'Internal' },
   { service: 'MongoDB', port: '27017', protocol: 'TCP', access: 'Internal' },
   { service: 'Kafka', port: '9092', protocol: 'TCP', access: 'Internal' },
@@ -557,9 +601,9 @@ export const architectureLayers = [
   },
   {
     name: 'Application Layer',
-    description: 'Backend microservices handling business logic for authentication, email processing, and notifications.',
+    description: 'Backend microservices handling business logic for authentication, email processing, notifications, and location management.',
     color: '#68D391',
-    services: ['authService', 'emailService', 'notificationService']
+    services: ['authService', 'emailService', 'notificationService', 'locationsService']
   },
   {
     name: 'Data Layer',

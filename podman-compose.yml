@@ -501,6 +501,9 @@ services:
       - ELASTICSEARCH_HOST=http://elasticsearch:9200
       # JWT secret for token verification (must match auth-service)
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      # Jaeger tracing configuration
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
       # Logstash connection for centralized logging (ELK stack)
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5000
@@ -1487,7 +1490,8 @@ services:
   # SCRAPE TARGETS:
   #   - email-service:3001/metrics
   #   - auth-service:3002/metrics
-  #   - notification-service:3003/metrics
+  #   - locations-service:3003/metrics
+  #   - notification-service:3004/metrics
   #   - traefik:8080/metrics
   # --------------------------------------------------------------------------
   prometheus:

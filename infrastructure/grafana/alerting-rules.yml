@@ -246,7 +246,7 @@ groups:
       # Uses the 'for' duration to track how long the condition has been true.
       - alert: RTOBreachCritical
         expr: |
-          up{job=~"email-service|auth-service|notification-service"} == 0
+          up{job=~"email-service|auth-service|notification-service|locations-service"} == 0
         for: 5m
         labels:
           severity: critical
