@@ -86,13 +86,22 @@ RUN mkdir -p /var/log/logstash && \
 # Switch back to logstash user
 USER logstash
 
+# MongoDB input plugin installation (DISABLED)
+# NOTE: The MongoDB pipeline has been disabled to resolve Kibana integration errors.
+# The plugin installation is commented out to speed up builds and avoid potential issues.
+# To re-enable the MongoDB pipeline:
+# 1. Uncomment the plugin installation below
+# 2. Uncomment the pipeline configuration in pipelines.yml
+# 3. Rebuild the Logstash container
+#
+# Original comment:
 # Install the MongoDB input plugin for the eccs-mongodb pipeline
 # This plugin is required to read email_logs and application_logs collections
 # from MongoDB and push them to Elasticsearch for Kibana dashboards.
 # NOTE: Plugin installation is memory-intensive (JRuby + bundler). We set
 # LS_JAVA_OPTS inline with 1GB heap because ENV values don't apply to RUN
 # commands during build. Without this, the build fails with OutOfMemoryError.
-RUN LS_JAVA_OPTS="-Xms1g -Xmx1g" /usr/share/logstash/bin/logstash-plugin install logstash-input-mongodb
+# RUN LS_JAVA_OPTS="-Xms1g -Xmx1g" /usr/share/logstash/bin/logstash-plugin install logstash-input-mongodb
 
 # Environment defaults for runtime - 256MB is sufficient for normal operation
 ENV LS_JAVA_OPTS="-Xms256m -Xmx256m"
