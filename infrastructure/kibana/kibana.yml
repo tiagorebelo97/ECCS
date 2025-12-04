@@ -111,6 +111,19 @@ newsfeed.enabled: false
 # -----------------------------------------------------------------------------
 # Disable Fleet integration and Elastic Package Registry connection.
 # This prevents Kibana from trying to connect to epr.elastic.co which causes
-# errors in air-gapped environments or when behind a proxy.
+# "Application Not Found" errors in air-gapped environments or when behind a proxy.
 # The ECCS platform uses Kibana only for log visualization, not Fleet/Elastic Agent.
+#
+# CONFIGURATION EXPLANATION:
+# - xpack.fleet.isAirGapped: Prevents connection attempts to epr.elastic.co
+# - xpack.fleet.registryUrl: Points to empty/disabled registry (prevents EPR lookups)
+# - xpack.fleet.agents.enabled: Disables the Fleet agents feature
+#
+# NOTE: If you see "Application Not Found" errors when accessing Integrations,
+# it's because the Elastic Package Registry (epr.elastic.co) is not accessible.
+# These settings properly disable Fleet/Integrations to avoid such errors.
 xpack.fleet.isAirGapped: true
+# Disable Fleet agents to prevent agent enrollment attempts
+xpack.fleet.agents.enabled: false
+# Set empty registry URL to prevent Elastic Package Registry lookups
+xpack.fleet.registryUrl: ""
