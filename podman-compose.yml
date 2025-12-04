@@ -1102,6 +1102,16 @@ services:
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: eccs-kibana
+    # -------------------------------------------------------------------------
+    # Volume Mounts for Custom Configuration
+    # -------------------------------------------------------------------------
+    # Mount the custom kibana.yml configuration which includes:
+    # - Fleet/Elastic Agent settings (xpack.fleet.isAirGapped: true)
+    # - UI customizations and default time ranges
+    # - Security settings and telemetry configuration
+    # -------------------------------------------------------------------------
+    volumes:
+      - ./infrastructure/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
     environment:
       # Elasticsearch connection
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
