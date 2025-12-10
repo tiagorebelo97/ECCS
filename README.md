@@ -349,6 +349,20 @@ GitHub Actions workflow includes:
 | `LOGSTASH_HOST` | Logstash server host | logstash |
 | `LOGSTASH_PORT` | Logstash TCP port | 5000 |
 
+## 📚 Documentation
+
+### API Gateway Deep Dive
+A comprehensive 45-slide PowerPoint presentation explaining Traefik API Gateway implementation:
+- **[API Gateway Deep Dive Presentation](docs/API_Gateway_Deep_Dive.pptx)** - Complete PowerPoint with architecture, security, integration patterns, and best practices
+- **[Presentation Guide](docs/API_GATEWAY_PRESENTATION_README.md)** - How to use the presentation
+- **[Implementation Summary](docs/API_GATEWAY_SUMMARY.md)** - Quick reference with code examples
+
+### Additional Documentation
+- **[Traefik Security](docs/TRAEFIK_SECURITY.md)** - Security architecture and configuration
+- **[API Documentation](docs/API.md)** - REST API endpoints
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment instructions
+- **[Monitoring & Alerting](docs/MONITORING_ALERTING.md)** - Observability setup
+
 ## 🤝 Contributing
 
 1. Fork the repository
