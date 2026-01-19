@@ -73,7 +73,7 @@ import axios from 'axios';
  * In production, this routes through Traefik at the root path.
  * In development, it can be overridden via environment variables.
  */
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://localhost:8443';
 
 /**
  * AXIOS INSTANCE
