@@ -561,8 +561,8 @@ export const flowExamples = [
 
 // Port summary for quick reference (used in HomePage)
 export const portSummary = [
-  { service: 'Frontend', port: '3000', protocol: 'HTTP', access: 'Public' },
-  { service: 'Docs Website', port: '3100', protocol: 'HTTP', access: 'Public' },
+  { service: 'Frontend', port: '3000', protocol: 'HTTPS', access: 'Public' },
+  { service: 'Docs Website', port: '3100', protocol: 'HTTPS', access: 'Public' },
   { service: 'Traefik HTTP', port: '8800', protocol: 'HTTP', access: 'Public' },
   { service: 'Traefik HTTPS', port: '8443', protocol: 'HTTPS', access: 'Public' },
   { service: 'Traefik Dashboard', port: '8080', protocol: 'HTTP', access: 'Internal' },

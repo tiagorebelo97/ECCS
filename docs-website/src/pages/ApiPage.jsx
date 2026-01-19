@@ -367,7 +367,7 @@ function ApiPage() {
           }}>
             <div>
               <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>Base URL</span>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}>http://localhost:8800</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}>https://localhost:8443</div>
             </div>
             <div>
               <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>Token Expiration</span>
