@@ -1,0 +1,8 @@
+# Development TLS certs (mkcert)
+# Mount your mkcert-generated certs into /certs inside the Traefik container
+# Example files expected: /certs/localhost.pem and /certs/localhost-key.pem
+
+tls:
+  certificates:
+    - certFile: /certs/localhost.pem
+      keyFile: /certs/localhost-key.pem
