@@ -57,6 +57,9 @@ temp/
 *.crt
 *.p12
 
+# Traefik mkcert generated certs (development only)
+infrastructure/traefik/certs/*
+
 # Database data (local development)
 data/
 pgdata/

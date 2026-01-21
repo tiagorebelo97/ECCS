@@ -32,6 +32,18 @@ For development and testing, use self-signed certificates generated with the scr
 
 **Important**: Self-signed certificates will show browser warnings because they're not trusted by certificate authorities.
 
+### Development: mkcert Certificates (Recommended)
+
+For a better development experience without browser warnings, use [mkcert](https://github.com/FiloSottile/mkcert) to generate locally-trusted certificates.
+
+**See [../mkcert/README.md](../mkcert/README.md) for detailed instructions on setting up mkcert with Traefik.**
+
+Benefits of mkcert:
+- **No browser warnings**: Certificates are automatically trusted by your browser
+- **Easy setup**: Simple command-line tool, no complex OpenSSL commands
+- **Local CA**: Installs a local certificate authority on your machine
+- **Production-like testing**: Test HTTPS features without security warnings
+
 ### Production: CA-Signed Certificates
 
 For production deployments, use certificates from a trusted Certificate Authority (CA):

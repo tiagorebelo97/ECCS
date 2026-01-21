@@ -1,0 +1,6 @@
+version: '3.8'
+services:
+  traefik:
+    volumes:
+      - ./dynamic/tls-dev.yml:/etc/traefik/dynamic/tls-dev.yml:ro
+      - ./certs:/certs:ro

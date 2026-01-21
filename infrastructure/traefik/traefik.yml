@@ -108,7 +108,7 @@ entryPoints:
 # Traefik supports multiple providers simultaneously for flexible deployment.
 #
 # NOTE: Docker provider is disabled to avoid permission issues with Podman.
-# All service routing is defined via the file provider in dynamic-config.yml.
+# All service routing is defined via the file provider in dynamic/ directory.
 # This ensures Traefik works reliably regardless of container runtime.
 #
 # CONTAINER LABEL FORMAT (for reference, not used when Docker provider is disabled):
@@ -144,9 +144,9 @@ providers:
   #   - Configure TLS certificates and options
   #   - Define all service routing (since Docker provider is disabled)
   file:
-    # Specific dynamic configuration file to load
-    # Contains all service definitions, routers, and middlewares
-    filename: "/etc/traefik/dynamic/dynamic-config.yml"
+    # Directory containing dynamic configuration files
+    # All .yml and .yaml files in this directory are loaded automatically
+    directory: "/etc/traefik/dynamic"
     # Watch for file changes (enables hot-reload)
     # DYNAMIC UPDATES: Configuration changes apply without restart
     watch: true
