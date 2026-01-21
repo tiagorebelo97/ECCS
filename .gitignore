@@ -64,3 +64,6 @@ mongodata/
 
 # Allow src/data directories for application data files
 !**/src/data/
+
+# Traefik mkcert generated certs (development only)
+infrastructure/traefik/certs/*
