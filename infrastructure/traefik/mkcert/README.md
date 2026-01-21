@@ -16,11 +16,25 @@ Ubuntu/Debian (example):
 
 ```bash
 # install mkcert (see https://mkcert.dev)
-# e.g. using snap or deb package depending on distro
+# Option 1: Using official package repository (recommended)
 sudo apt install libnss3-tools
-wget -O mkcert https://dl.filippo.io/mkcert/latest?for=linux/amd64
-chmod +x mkcert
-sudo mv mkcert /usr/local/bin/
+
+# For newer Ubuntu/Debian versions with snap:
+sudo snap install mkcert
+
+# Option 2: Manual installation with verification
+# Download from GitHub releases and verify checksum
+# Visit: https://github.com/FiloSottile/mkcert/releases
+# Download the appropriate binary and its checksum file
+# Example for Linux amd64:
+wget https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64
+wget https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-linux-amd64.sha256
+# Verify checksum
+sha256sum -c mkcert-v1.4.4-linux-amd64.sha256
+# If checksum matches, install
+chmod +x mkcert-v1.4.4-linux-amd64
+sudo mv mkcert-v1.4.4-linux-amd64 /usr/local/bin/mkcert
+
 mkcert -install
 ```
 
