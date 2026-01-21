@@ -66,7 +66,7 @@
 #   This configuration is optimized for podman-compose. The traefik service
 #   uses simple dependencies (not condition: service_healthy) to avoid 
 #   potential blocking during startup. Traefik's built-in health checking
-#   mechanism in dynamic-config.yml handles service discovery.
+#   mechanism in the dynamic/ directory handles service discovery.
 #
 # SECURITY FEATURES:
 #   - All services run as non-root users where supported
@@ -818,9 +818,10 @@ services:
       # -----------------------------------------------------------------------
       # Loads middlewares, TLS options, and static service definitions
       # NOTE: Docker provider is disabled to avoid Podman socket permission issues.
-      # All service routing is defined in dynamic-config.yml instead.
+      # All service routing is defined in the dynamic/ directory.
+      # All .yml and .yaml files in the dynamic directory are loaded automatically.
       - "--providers.docker=false"
-      - "--providers.file.filename=/etc/traefik/dynamic/dynamic-config.yml"
+      - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       # -----------------------------------------------------------------------
       # Entrypoints - Network Entry Points

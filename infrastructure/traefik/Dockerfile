@@ -75,7 +75,7 @@ COPY traefik.yml /etc/traefik/traefik.yml
 # These files are watched for changes and reloaded automatically
 # The compose file mounts ./infrastructure/traefik to /etc/traefik/dynamic
 # so we copy *.yml files that should be baked into the image
-COPY dynamic-config.yml /etc/traefik/dynamic/dynamic-config.yml
+COPY dynamic/dynamic-config.yml /etc/traefik/dynamic/dynamic-config.yml
 
 # Create directories and set permissions
 # SECURITY: Traefik runs as non-root user (UID 65532)
